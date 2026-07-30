@@ -105,6 +105,18 @@ your project):
 (`form-builder-theme` is also exported as `THEME_STORAGE_KEY` from the kit,
 if you'd rather not hardcode the string.)
 
+## Importing a form from a markdown doc
+
+The Dashboard's "Import from Markdown" button (`parseMarkdownToForm` in
+`utils/markdownImport.js`) turns a markdown survey doc into a form:
+`#`/`##` headings become the title/sections, list items become questions,
+and simple text patterns infer the answer type — a `[ Pass / Fail ]`
+prefix, a `(1-5)`/`(0-10)` range, a `(Yes/No)` marker, or a `(A / B / C)`
+option list. There's no standard grammar for "survey written as markdown",
+so this is heuristic, not a guaranteed 1:1 conversion — importing always
+lands you in the Builder so you can fix any misclassified questions before
+using the form.
+
 ## What's swappable later
 
 - **Responses**: `submitResponse`/`listResponses`/`exportResponsesToFile`
