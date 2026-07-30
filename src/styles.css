@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Brand accent scale — falls back to a neutral indigo placeholder.
+   A consuming project overrides these by setting the --fb-brand-* custom
+   properties (see BrandProvider), without needing to touch this file. */
+@theme {
+  --color-brand-50: var(--fb-brand-50, #eef2ff);
+  --color-brand-100: var(--fb-brand-100, #e0e7ff);
+  --color-brand-200: var(--fb-brand-200, #c7d2fe);
+  --color-brand-300: var(--fb-brand-300, #a5b4fc);
+  --color-brand-400: var(--fb-brand-400, #818cf8);
+  --color-brand-500: var(--fb-brand-500, #6366f1);
+  --color-brand-600: var(--fb-brand-600, #4f46e5);
+  --color-brand-700: var(--fb-brand-700, #4338ca);
+  --color-brand-800: var(--fb-brand-800, #3730a3);
+  --color-brand-900: var(--fb-brand-900, #312e81);
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+.dark body {
+  background-color: #020817;
+}
+
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-track { background: #e2e8f0; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+.dark ::-webkit-scrollbar-track { background: #0f172a; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }

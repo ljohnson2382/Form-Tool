@@ -1,25 +1,38 @@
 # form-builder
 
 A Microsoft Forms–style form/survey builder, built to be embedded in any
-project rather than tied to one brand. This repo is a monorepo:
+project rather than tied to one brand. The repo root **is** the installable
+package (`form-builder-kit`); `demo/` is this repo's own running app — a
+"staging" brand consuming the kit as a local dependency, for dev and preview.
 
 ```
-packages/form-builder-kit/   the reusable engine (npm package)
-apps/demo/                   this repo's own running app — a "staging" brand
-                              consuming the kit, for local dev and preview
+src/            the reusable engine — this is what gets published/installed
+demo/           this repo's own app: a plain Vite project that depends on
+                the kit via "file:.." (not an npm workspace member)
 ```
+
+(Earlier this was an npm-workspaces monorepo with the kit nested under
+`packages/form-builder-kit`. That structure looked reasonable but silently
+broke external installs: npm's git-dependency fetcher has no concept of
+"install just this one workspace member" — it clones the whole repo and
+resolves whatever `package.json` sits at the git root, ignoring any `#path:`
+fragment. Collapsing so the repo root **is** the package is what actually
+makes `npm install github:...` work, not a workaround for something else.)
 
 ## Run the demo locally
 
 ```bash
-npm install
-npm run dev
+npm install                # builds the kit via its own `prepare` script
+npm --prefix demo install  # links the kit in via "file:.." and runs demo
+npm --prefix demo run dev
 ```
 
-This builds the kit and starts the demo app at `http://localhost:5173`,
-themed with a neutral placeholder "Staging Forms" brand (violet accent, no
-logo image, gradient background) and pre-seeded with an example form (the
-ITZipper UAT survey, `apps/demo/src/seeds/itzipperUatSurvey.js`).
+Starts the demo app at `http://localhost:5173`, themed with a neutral
+placeholder "Staging Forms" brand (violet accent, no logo image, gradient
+background) and pre-seeded with an example form (the ITZipper UAT survey,
+`demo/src/seeds/itzipperUatSurvey.js`). Re-run `npm install` at the repo
+root after changing anything in `src/` — `demo`'s dev server reads the
+built `dist/`, not the source directly.
 
 ## Using `form-builder-kit` in another project
 
@@ -27,12 +40,13 @@ Install directly from this repo (private, so the consuming machine needs
 access):
 
 ```bash
-npm install github:ljohnson2382/form-builder#path:packages/form-builder-kit
+npm install github:ljohnson2382/form-builder#claude/forms-like-app-7b6ph8
 ```
 
 npm clones the repo, installs the kit's own devDependencies, and runs its
 `prepare` script (`vite build`) automatically — no need to publish to a
-registry or commit `dist/`.
+registry or commit `dist/`. (Swap the branch name for whatever's current —
+check with `git ls-remote` if unsure.)
 
 Then mount it:
 
@@ -59,7 +73,7 @@ deleted.
 
 Every field is optional; omit anything to fall back to the neutral default
 (indigo accent, monogram logo, gradient background — see
-`packages/form-builder-kit/src/context/BrandContext.jsx`).
+`src/context/BrandContext.jsx`).
 
 ```js
 export const myBrand = {
@@ -76,7 +90,7 @@ export const myBrand = {
 }
 ```
 
-See `apps/demo/src/brands/itzipper.js` for a filled-out example (ITZipper's
+See `demo/src/brands/itzipper.js` for a filled-out example (ITZipper's
 actual brand, not wired up by default — just a reference for what a real
 project's config looks like).
 
