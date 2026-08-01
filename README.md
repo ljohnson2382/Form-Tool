@@ -69,6 +69,47 @@ createRoot(document.getElementById('root')).render(
 load) — they never overwrite forms a user has since created, edited, or
 deleted.
 
+### Authoring vs. responding
+
+`FormBuilderApp` has two surfaces, and which one you mount matters:
+
+```jsx
+// You: full authoring — dashboard, builder, response export.
+<FormBuilderApp brand={myBrand} seedForms={myForms} />
+
+// A test participant: that one form, submit only. No dashboard, no editing,
+// no way to read anyone else's answers.
+<FormBuilderApp brand={myBrand} mode="fill" formId={someFormId} />
+```
+
+Mount `mode="fill"` for anything you hand to a respondent. While responses
+live in the respondent's own browser this is mostly about intent and
+ergonomics — but the moment you swap `responseStore` for a real backend, the
+distinction becomes an actual authorization boundary, and **the server has to
+enforce it too**. Client-side code can't be what decides who may read other
+people's answers. The demo shows both surfaces: `/` for authoring,
+`/?mode=fill&formId=<id>` for responding.
+
+### Keeping instances apart
+
+IndexedDB is scoped to the origin, so two mounts on the same origin (say
+`/uat` and `/feedback`) would share one set of forms *and one set of collected
+responses*. Pass `storageNamespace` to separate them:
+
+```jsx
+<FormBuilderApp brand={myBrand} storageNamespace="uat" />
+```
+
+### Imported files are validated
+
+Form JSON is arbitrary file content, so it's validated at the import gate
+rather than trusted: a file that isn't a form export is rejected with a
+specific reason, and anything that is gets normalized to the documented
+shape before it's stored. Rating scales are clamped to `MAX_SCALE_POINTS`
+so a malformed range can't ask the browser to render a billion buttons.
+Screens are additionally wrapped in an error boundary, so one bad record
+degrades to an inline error with a way back rather than a blank page.
+
 ### Brand config
 
 Every field is optional; omit anything to fall back to the neutral default

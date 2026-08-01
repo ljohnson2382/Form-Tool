@@ -1,4 +1,4 @@
-import { QUESTION_TYPES } from '../../data/formSchema'
+import { QUESTION_TYPES, normalizeScale, normalizeOptions } from '../../data/formSchema'
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100 disabled:opacity-60'
@@ -18,6 +18,32 @@ function ChoiceButton({ active, disabled, onClick, children }) {
     >
       {children}
     </button>
+  )
+}
+
+// normalizeScale rather than item.scale directly: a stored scale can be
+// missing, inverted, non-numeric, or wide enough to hang the tab if handed
+// straight to Array.from.
+function RatingScale({ item, value, disabled, onChange }) {
+  const scale = normalizeScale(item.scale)
+  const points = Array.from({ length: scale.max - scale.min + 1 }, (_, i) => scale.min + i)
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {points.map((n) => (
+          <ChoiceButton key={n} active={value === n} disabled={disabled} onClick={() => onChange(n)}>
+            {n}
+          </ChoiceButton>
+        ))}
+      </div>
+      {(scale.minLabel || scale.maxLabel) && (
+        <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>{scale.minLabel}</span>
+          <span>{scale.maxLabel}</span>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -73,31 +99,17 @@ export default function QuestionField({ item, value, onChange, error, disabled =
 
       {item.type === QUESTION_TYPES.MULTIPLE_CHOICE && (
         <div className="flex flex-wrap gap-2">
-          {(item.options ?? []).map((opt) => (
-            <ChoiceButton key={opt} active={value === opt} disabled={disabled} onClick={() => onChange(opt)}>
+          {normalizeOptions(item.options).map((opt, index) => (
+            // Keyed by index as well as text: duplicate option labels are easy
+            // to create in the Builder and would otherwise collide as keys.
+            <ChoiceButton key={`${index}-${opt}`} active={value === opt} disabled={disabled} onClick={() => onChange(opt)}>
               {opt}
             </ChoiceButton>
           ))}
         </div>
       )}
 
-      {item.type === QUESTION_TYPES.RATING_SCALE && (
-        <div>
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: item.scale.max - item.scale.min + 1 }, (_, i) => item.scale.min + i).map((n) => (
-              <ChoiceButton key={n} active={value === n} disabled={disabled} onClick={() => onChange(n)}>
-                {n}
-              </ChoiceButton>
-            ))}
-          </div>
-          {(item.scale.minLabel || item.scale.maxLabel) && (
-            <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>{item.scale.minLabel}</span>
-              <span>{item.scale.maxLabel}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {item.type === QUESTION_TYPES.RATING_SCALE && <RatingScale item={item} value={value} disabled={disabled} onChange={onChange} />}
 
       {item.type === QUESTION_TYPES.PASS_FAIL && (
         <div className="space-y-2">

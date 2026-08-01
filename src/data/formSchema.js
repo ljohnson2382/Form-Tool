@@ -18,10 +18,68 @@ export const QUESTION_TYPE_LABELS = {
   [QUESTION_TYPES.PASS_FAIL]: 'Pass / Fail',
 }
 
+function randomToken() {
+  const webCrypto = globalThis.crypto
+  if (webCrypto?.randomUUID) return webCrypto.randomUUID()
+  if (webCrypto?.getRandomValues) {
+    const bytes = webCrypto.getRandomValues(new Uint8Array(16))
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  // Last resort for environments without WebCrypto at all. Math.random is not
+  // unguessable — fine while IDs are only local database keys, but anything
+  // that turns an ID into a shareable link needs the branches above.
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export function createId(prefix = 'id') {
-  const uuid =
-    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  return `${prefix}-${uuid}`
+  return `${prefix}-${randomToken()}`
+}
+
+// Upper bound on how many buttons one rating scale may render. This exists so
+// a malformed import or a fat-fingered Max field (1000000000) can't ask the
+// browser to build a billion-element array and hang the tab. It's a safety
+// valve rather than a survey-design opinion, so it sits well above any real
+// scale — 0-10 NPS, the widest in normal use, needs 11.
+export const MAX_SCALE_POINTS = 51
+
+const DEFAULT_SCALE = { min: 1, max: 5, minLabel: '', maxLabel: '' }
+
+function toInteger(value, fallback) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback
+}
+
+function toText(value, fallback = '') {
+  return typeof value === 'string' ? value : fallback
+}
+
+/**
+ * Always returns a scale that can be rendered, whatever shape came in —
+ * missing entirely, non-numeric, inverted, or absurdly wide. Call this at
+ * every point a scale is about to be rendered or persisted so the render
+ * path never has to trust stored data.
+ */
+export function normalizeScale(scale) {
+  const source = scale && typeof scale === 'object' ? scale : DEFAULT_SCALE
+  const min = toInteger(source.min, DEFAULT_SCALE.min)
+  let max = toInteger(source.max, DEFAULT_SCALE.max)
+  if (max < min) max = min
+  if (max - min + 1 > MAX_SCALE_POINTS) max = min + MAX_SCALE_POINTS - 1
+  return { min, max, minLabel: toText(source.minLabel), maxLabel: toText(source.maxLabel) }
+}
+
+/** Options as a clean array of strings, whatever was stored. */
+export function normalizeOptions(options) {
+  return Array.isArray(options) ? options.filter((option) => typeof option === 'string') : []
+}
+
+/** Safe accessors so a malformed record degrades to "empty" instead of throwing mid-render. */
+export function sectionsOf(form) {
+  return Array.isArray(form?.sections) ? form.sections : []
+}
+
+export function itemsOf(section) {
+  return Array.isArray(section?.items) ? section.items : []
 }
 
 export function createItem(type) {
@@ -37,7 +95,7 @@ export function createItem(type) {
     case QUESTION_TYPES.MULTIPLE_CHOICE:
       return { ...base, options: ['Option 1', 'Option 2'] }
     case QUESTION_TYPES.RATING_SCALE:
-      return { ...base, scale: { min: 1, max: 5, minLabel: '', maxLabel: '' } }
+      return { ...base, scale: { ...DEFAULT_SCALE } }
     case QUESTION_TYPES.PASS_FAIL:
       return { ...base, allowNotes: true }
     default:
@@ -62,11 +120,11 @@ export function createEmptyForm(title = 'Untitled Form') {
 }
 
 export function isAnswerable(item) {
-  return item.type !== QUESTION_TYPES.SECTION_HEADER
+  return item?.type !== QUESTION_TYPES.SECTION_HEADER
 }
 
 export function countQuestions(form) {
-  return form.sections.reduce((sum, section) => sum + section.items.filter(isAnswerable).length, 0)
+  return sectionsOf(form).reduce((sum, section) => sum + itemsOf(section).filter(isAnswerable).length, 0)
 }
 
 function isEmptyValue(item, value) {
@@ -78,8 +136,8 @@ function isEmptyValue(item, value) {
 
 export function validateResponses(form, answers) {
   const errors = {}
-  for (const section of form.sections) {
-    for (const item of section.items) {
+  for (const section of sectionsOf(form)) {
+    for (const item of itemsOf(section)) {
       if (!isAnswerable(item) || !item.required) continue
       if (isEmptyValue(item, answers[item.id])) {
         errors[item.id] = 'This field is required.'

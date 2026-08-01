@@ -1,26 +1,33 @@
 import { openDb, promisifyRequest } from './db'
 import { createId } from '../data/formSchema'
+import { normalizeForm } from '../data/formValidation'
 
 // Each form is stored as its own independent record — never merged into a
 // single blob — so forms can be listed, duplicated, and deleted individually.
+//
+// Every read and write passes through normalizeForm, so screens can rely on
+// the documented shape without defensive checks of their own. Reads are
+// lenient (repair, don't throw) so a record written by an older build still
+// lists and can still be deleted; imports are strict (see importForm).
 
 export async function listForms() {
   const db = await openDb()
   const store = db.transaction('forms', 'readonly').objectStore('forms')
   const forms = await promisifyRequest(store.getAll())
-  return forms.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+  return forms.map((form) => normalizeForm(form)).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
 }
 
 export async function getForm(id) {
   const db = await openDb()
   const store = db.transaction('forms', 'readonly').objectStore('forms')
-  return promisifyRequest(store.get(id))
+  const form = await promisifyRequest(store.get(id))
+  return form ? normalizeForm(form) : form
 }
 
 export async function saveForm(form) {
   const db = await openDb()
   const store = db.transaction('forms', 'readwrite').objectStore('forms')
-  const updated = { ...form, updatedAt: new Date().toISOString() }
+  const updated = { ...normalizeForm(form), updatedAt: new Date().toISOString() }
   await promisifyRequest(store.put(updated))
   return updated
 }
@@ -45,15 +52,21 @@ export async function duplicateForm(id) {
   return saveForm(copy)
 }
 
+/**
+ * Imports a form parsed from an arbitrary file. Validated strictly so a file
+ * that isn't a form export is rejected with a clear message rather than
+ * persisted and then blowing up at render time. Throws FormValidationError.
+ */
 export async function importForm(form) {
   const now = new Date().toISOString()
-  const imported = {
-    ...form,
+  const validated = normalizeForm(form, { strict: true })
+  return saveForm({
+    ...validated,
+    // A fresh ID, so importing can never overwrite a form already stored.
     id: createId('form'),
-    createdAt: form.createdAt ?? now,
+    createdAt: validated.createdAt ?? now,
     updatedAt: now,
-  }
-  return saveForm(imported)
+  })
 }
 
 // Only seeds on a fresh/empty store — never overwrites forms the user has

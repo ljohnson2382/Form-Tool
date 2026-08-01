@@ -3,7 +3,7 @@ import Button from '../components/common/Button'
 import Card from '../components/common/Card'
 import QuestionField from '../components/fill/QuestionField'
 import { getForm } from '../utils/formStore'
-import { validateResponses } from '../data/formSchema'
+import { validateResponses, sectionsOf, itemsOf } from '../data/formSchema'
 import { submitResponse } from '../utils/responseStore'
 
 export default function FillScreen({ formId, onBack }) {
@@ -11,12 +11,20 @@ export default function FillScreen({ formId, onBack }) {
   const [answers, setAnswers] = useState({})
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    getForm(formId).then((loaded) => {
-      if (!cancelled) setForm(loaded)
-    })
+    setLoadFailed(false)
+    getForm(formId)
+      .then((loaded) => {
+        if (cancelled) return
+        if (loaded) setForm(loaded)
+        else setLoadFailed(true)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true)
+      })
     return () => {
       cancelled = true
     }
@@ -44,6 +52,14 @@ export default function FillScreen({ formId, onBack }) {
     setSubmitted(false)
   }
 
+  if (loadFailed) {
+    return (
+      <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+        This form isn’t available. Check the link you were given.
+      </Card>
+    )
+  }
+
   if (!form) {
     return <div className="flex items-center justify-center py-24 text-sm text-slate-500 dark:text-slate-400">Loading form…</div>
   }
@@ -57,7 +73,8 @@ export default function FillScreen({ formId, onBack }) {
             <Button variant="secondary" onClick={handleFillAnother}>
               Submit Another Response
             </Button>
-            <Button onClick={onBack}>Back to Dashboard</Button>
+            {/* Respondent mode has no dashboard to return to. */}
+            {onBack && <Button onClick={onBack}>Back to Dashboard</Button>}
           </div>
         </Card>
       </div>
@@ -66,11 +83,13 @@ export default function FillScreen({ formId, onBack }) {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <Button variant="ghost" onClick={onBack}>
-          ← Back to Dashboard
-        </Button>
-      </div>
+      {onBack && (
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <Button variant="ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </Button>
+        </div>
+      )}
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold">{form.title}</h1>
@@ -78,12 +97,12 @@ export default function FillScreen({ formId, onBack }) {
       </div>
 
       <div className="space-y-4">
-        {form.sections.map((section) => (
+        {sectionsOf(form).map((section) => (
           <Card key={section.id}>
             <h2 className="mb-1 text-lg font-semibold">{section.title}</h2>
             {section.description && <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">{section.description}</p>}
             <div className="space-y-4">
-              {section.items.map((item) => (
+              {itemsOf(section).map((item) => (
                 <div key={item.id} id={`item-${item.id}`}>
                   <QuestionField
                     item={item}

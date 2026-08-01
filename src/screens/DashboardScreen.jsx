@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import { createEmptyForm, countQuestions } from '../data/formSchema'
 import { listForms, saveForm, deleteForm, duplicateForm, importForm } from '../utils/formStore'
 import { deleteResponsesForForm } from '../utils/responseStore'
+import { FormValidationError } from '../data/formValidation'
 import {
   saveJsonToFile,
   suggestedFormFilename,
@@ -48,8 +49,12 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   }
 
   async function handleDeleteConfirmed() {
-    await deleteForm(pendingDelete.id)
+    // Responses first. These are two transactions, so if the tab closes
+    // between them, this ordering leaves a form with no responses (visible,
+    // deletable again) rather than orphaned personal data with no form left
+    // to reach it — the dialog promises the responses are gone.
     await deleteResponsesForForm(pendingDelete.id)
+    await deleteForm(pendingDelete.id)
     setPendingDelete(null)
     refresh()
   }
@@ -62,6 +67,13 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
     }
   }
 
+  // The import gate rejects with a specific reason ("no sections list", etc.);
+  // pass that through rather than replacing it with a generic message.
+  function importErrorMessage(error) {
+    if (error instanceof FormValidationError) return error.message
+    return 'Couldn’t import that file — make sure it’s a valid form JSON export.'
+  }
+
   async function handleImportClick() {
     setError('')
     if (supportsFileSystemAccess) {
@@ -70,8 +82,8 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         if (!data) return
         await importForm(data)
         refresh()
-      } catch {
-        setError('Couldn’t import that file — make sure it’s a valid form JSON export.')
+      } catch (err) {
+        setError(importErrorMessage(err))
       }
     } else {
       fileInputRef.current?.click()
@@ -86,8 +98,8 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
       const data = await readJsonFromInputFile(file)
       await importForm(data)
       refresh()
-    } catch {
-      setError('Couldn’t import that file — make sure it’s a valid form JSON export.')
+    } catch (err) {
+      setError(importErrorMessage(err))
     }
   }
 

@@ -1,4 +1,4 @@
-import { QUESTION_TYPES, QUESTION_TYPE_LABELS } from '../../data/formSchema'
+import { QUESTION_TYPES, QUESTION_TYPE_LABELS, MAX_SCALE_POINTS } from '../../data/formSchema'
 import Button from '../common/Button'
 
 const inputClass =
@@ -52,10 +52,13 @@ function TypeFields({ item, onChange }) {
     const scale = item.scale ?? { min: 1, max: 5, minLabel: '', maxLabel: '' }
     return (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* The real safety net is normalizeScale at render/save time — these
+            bounds just steer toward a sane range without fighting typing. */}
         <label className="text-xs text-slate-500 dark:text-slate-400">
           Min
           <input
             type="number"
+            step="1"
             className={inputClass}
             value={scale.min}
             onChange={(e) => onChange({ ...item, scale: { ...scale, min: Number(e.target.value) } })}
@@ -65,6 +68,8 @@ function TypeFields({ item, onChange }) {
           Max
           <input
             type="number"
+            step="1"
+            max={scale.min + MAX_SCALE_POINTS - 1}
             className={inputClass}
             value={scale.max}
             onChange={(e) => onChange({ ...item, scale: { ...scale, max: Number(e.target.value) } })}
