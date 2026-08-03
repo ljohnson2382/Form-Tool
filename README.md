@@ -217,42 +217,69 @@ read-only question rendering as Preview).
 
 ### Reference server (`form-builder-kit/server`)
 
-A ready-to-use implementation of that HTTP contract, built on
-[Vercel Blob](https://vercel.com/docs/storage/vercel-blob) — storage for
-this is deliberately just JSON files (`forms/<id>.json`,
-`responses/<formId>.json`), swappable later by changing
-`src/server/blobStore.js` alone. Wire it into any Vercel project's `api/`
-folder in a few lines (see `demo/api/forms.js` / `demo/api/responses.js`
-for the working example this repo deploys):
+Two ready-to-use implementations of that HTTP contract ship with the kit —
+pick one via the `store` option, or supply your own object implementing the
+same five functions (`getPublishedForm`/`putPublishedForm`/
+`deletePublishedForm`/`listResponsesFor`/`appendResponse`):
+
+- **`cosmosStore`** — [Azure Cosmos DB](https://azure.microsoft.com/products/cosmos-db)
+  (NoSQL API). This is what `demo/api/` actually deploys with. Forms and
+  responses are each their own document (`forms`/`responses` containers,
+  partitioned by `id`/`formId` respectively) — a response is a single
+  atomic `items.create`, not a read-modify-write of every response ever
+  submitted, which is what makes it hold up under concurrent submitters.
+  Needs `COSMOS_ENDPOINT` and `COSMOS_KEY` (see the runbook below); the
+  database and both containers are created automatically on first use.
+- **`blobStore`** — [Vercel Blob](https://vercel.com/docs/storage/vercel-blob),
+  simpler to stand up (`BLOB_READ_WRITE_TOKEN` only, no separate resource to
+  provision) but models each form's responses as one shared JSON array, so
+  it doesn't scale as well under concurrent submitters. Fine for a small
+  internal tool; `cosmosStore` is the better default otherwise.
+
+Wire whichever you pick into any Vercel project's `api/` folder in a few
+lines (see `demo/api/forms.js` / `demo/api/responses.js` for the working
+example this repo deploys):
 
 ```js
 // api/forms.js
-import { createFormsHandler } from 'form-builder-kit/server'
+import { createFormsHandler, cosmosStore } from 'form-builder-kit/server'
 
 export default createFormsHandler({
   adminToken: process.env.ADMIN_API_TOKEN,
   allowedOrigin: process.env.FILL_APP_ORIGIN,
+  store: cosmosStore, // omit (or use blobStore) to use Vercel Blob instead
 })
 ```
 
 ```js
 // api/responses.js
-import { createResponsesHandler } from 'form-builder-kit/server'
+import { createResponsesHandler, cosmosStore } from 'form-builder-kit/server'
 
 export default createResponsesHandler({
   adminToken: process.env.ADMIN_API_TOKEN,
   allowedOrigin: process.env.FILL_APP_ORIGIN,
+  store: cosmosStore,
 })
 ```
 
-**Security note**: publishing a form and reading its responses are gated by
-one shared-secret header (`x-admin-token`, checked against
-`ADMIN_API_TOKEN`) rather than a real login system — the admin app's own
-browser bundle carries this secret (as `VITE_ADMIN_TOKEN`), so it's visible
-to anyone who opens devtools on that app. That's a real limitation, fine for
-an internal UAT tool, not sufficient once this holds anything sensitive.
-Submitting a response has no auth at all, since an anonymous respondent has
-no prior relationship with the backend to authenticate.
+**Security notes**:
+- Publishing a form and reading its responses are gated by one shared-secret
+  header (`x-admin-token`, checked against `ADMIN_API_TOKEN`) rather than a
+  real login system — the admin app's own browser bundle carries this
+  secret (as `VITE_ADMIN_TOKEN`), so it's visible to anyone who opens
+  devtools on that app. That's a real limitation, fine for an internal UAT
+  tool, not sufficient once this holds anything sensitive. Submitting a
+  response has no auth at all, since an anonymous respondent has no prior
+  relationship with the backend to authenticate.
+- `cosmosStore` is fully authenticated at the database layer — Cosmos DB has
+  no public/unauthenticated access mode, `COSMOS_KEY` is required for every
+  operation, and that key only ever lives in server-side Vercel env vars
+  (never sent to the browser). That said, the *primary key* grants full
+  read/write access to the entire Cosmos account, not just these two
+  containers — for tighter production security, switch to Azure AD auth
+  with scoped RBAC instead of the master key. Not done here; it needs an
+  Azure AD app registration and token handling this reference
+  implementation deliberately keeps out of scope.
 
 ### `fill/` — the respondent-only deploy
 
@@ -268,10 +295,17 @@ attaching a subdomain is a manual DNS record rather than a dashboard click:
 
 1. Push the repo to GitHub. In Vercel, create **project #1** from it with
    root directory `demo/` — this is the admin app.
-2. Vercel dashboard → **Storage** → create a Blob store, then add to
-   project #1's env vars: the generated `BLOB_READ_WRITE_TOKEN`, a
-   generated `ADMIN_API_TOKEN` (any long random string), the same value
-   again as `VITE_ADMIN_TOKEN`, and `FILL_APP_ORIGIN=https://forms.itzipper.com`.
+2. Create an Azure Cosmos DB account (NoSQL API) — Azure Portal → "Azure
+   Cosmos DB for NoSQL" → Create, or `az cosmosdb create --kind GlobalDocumentDB
+   --capabilities EnableServerless` (serverless billing is the right choice
+   for this workload's traffic pattern). Copy its **URI** and a **primary
+   key** from the account's "Keys" page. Add to project #1's env vars:
+   `COSMOS_ENDPOINT` (the URI), `COSMOS_KEY` (the primary key), a generated
+   `ADMIN_API_TOKEN` (any long random string), the same value again as
+   `VITE_ADMIN_TOKEN`, and `FILL_APP_ORIGIN=https://forms.itzipper.com`.
+   (Using `blobStore` instead — see "Reference server" above — needs only
+   Vercel dashboard → **Storage** → create a Blob store → `BLOB_READ_WRITE_TOKEN`,
+   no separate Azure resource.)
 3. Create **project #2** from the same repo with root directory `fill/` —
    the respondent app. Env var: `VITE_API_BASE_URL=https://staging.itzipper.com/api`.
 4. In each Vercel project, add its custom domain (`staging.itzipper.com` for

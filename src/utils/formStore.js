@@ -114,11 +114,20 @@ export async function duplicateForm(id) {
  * persisted and then blowing up at render time. Throws FormValidationError.
  */
 export async function importForm(form) {
-  const now = new Date().toISOString()
   const validated = normalizeForm(form, { strict: true })
+  const db = await openDb()
+  const store = db.transaction('forms', 'readonly').objectStore('forms')
+  const existing = await promisifyRequest(store.get(validated.id))
+
+  if (!existing) {
+    // True export/import round-trip: preserve id and timestamps exactly.
+    return saveForm(validated, { touch: false })
+  }
+
+  const now = new Date().toISOString()
   return saveForm({
     ...validated,
-    // A fresh ID, so importing can never overwrite a form already stored.
+    // If this instance already has the same id, avoid clobbering it.
     id: createId('form'),
     createdAt: validated.createdAt ?? now,
     updatedAt: now,

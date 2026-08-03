@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import Card from '../common/Card'
 import { deriveColorScale } from '../../utils/colorScale'
 
@@ -57,11 +58,21 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
   const fields = fieldsFromBrand(brand)
   const pickerColor = brand?.colors?.[500] ?? DEFAULT_PICKER_COLOR
 
+  // A free-typed draft, separate from pickerColor, so partial input (e.g.
+  // "#3b8") isn't overwritten mid-keystroke by the last valid derived color
+  // — synced back only when the brand's actual color changes from outside
+  // (a preset, switching forms, clearing branding).
+  const [accentText, setAccentText] = useState(pickerColor)
+  useEffect(() => {
+    setAccentText(pickerColor)
+  }, [pickerColor])
+
   function updateField(key, value) {
     onChange({ ...(brand ?? {}), [key]: value })
   }
 
   function updateColor(hex) {
+    setAccentText(hex)
     const colors = deriveColorScale(hex)
     if (colors) onChange({ ...(brand ?? {}), colors })
   }
@@ -199,12 +210,21 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
           />
           <div>
             <label className={labelClass}>Accent color</label>
-            <input
-              type="color"
-              className="h-10 w-16 cursor-pointer rounded border border-slate-200 bg-white p-1 dark:border-slate-700/50 dark:bg-slate-800/40"
-              value={pickerColor}
-              onChange={(e) => updateColor(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <input
+                className={inputClass}
+                placeholder="e.g. #6366f1"
+                value={accentText}
+                onChange={(e) => updateColor(e.target.value)}
+              />
+              <input
+                type="color"
+                aria-label="Pick an accent color"
+                className="h-10 w-10 shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-1 dark:border-slate-700/50 dark:bg-slate-800/40"
+                value={HEX_COLOR.test(accentText) ? accentText : '#ffffff'}
+                onChange={(e) => updateColor(e.target.value)}
+              />
+            </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Fills primary buttons (Save, Submit).</p>
           </div>
         </div>

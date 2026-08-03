@@ -43,6 +43,23 @@ const STATUS_LABEL = {
   stale: 'Unpublished changes',
 }
 
+// Forms with no projectId set (the common case until someone starts using
+// the field) land in one "Unassigned" group at the end, rather than
+// scattered among named projects alphabetically.
+function groupByProject(forms) {
+  const groups = new Map()
+  for (const form of forms) {
+    const key = form.projectId || 'Unassigned'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(form)
+  }
+  return [...groups.entries()].sort(([a], [b]) => {
+    if (a === 'Unassigned') return 1
+    if (b === 'Unassigned') return -1
+    return a.localeCompare(b)
+  })
+}
+
 function fillUrlFor(form, fillBaseUrl) {
   if (fillBaseUrl) return `${fillBaseUrl.replace(/\/$/, '')}?formId=${form.id}`
   // No separate fill deployment configured — fall back to this same app's
@@ -94,8 +111,8 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   async function handleExport(form) {
     try {
       await saveJsonToFile(form, suggestedFormFilename(form))
-    } catch {
-      setError(`Couldn't export "${form.title}".`)
+    } catch (err) {
+      setError(`Couldn't export "${form.title}": ${err.message}`)
     }
   }
 
@@ -141,7 +158,8 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   // pass that through rather than replacing it with a generic message.
   function importErrorMessage(error) {
     if (error instanceof FormValidationError) return error.message
-    return 'Couldn’t import that file — make sure it’s a valid form JSON export.'
+    if (error instanceof SyntaxError) return `That file isn’t valid JSON (${error.message}) — it may be empty or corrupted.`
+    return `Couldn’t import that file — make sure it’s a valid form JSON export. (${error.message})`
   }
 
   async function handleImportClick() {
@@ -153,6 +171,13 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         await importForm(data)
         refresh()
       } catch (err) {
+        if (err?.name === 'NotAllowedError') {
+          // The native picker itself failed to open (lost focus, a
+          // permissions policy, a browser quirk) rather than the user
+          // declining — fall back to the plain <input type=file> picker.
+          fileInputRef.current?.click()
+          return
+        }
         setError(importErrorMessage(err))
       }
     } else {
@@ -188,7 +213,11 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         const text = await openMarkdownFile()
         if (text === null) return
         await handleMarkdownImported(text, 'Imported Form')
-      } catch {
+      } catch (err) {
+        if (err?.name === 'NotAllowedError') {
+          markdownInputRef.current?.click()
+          return
+        }
         setError('Couldn’t import that markdown file.')
       }
     } else {
@@ -208,6 +237,79 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
     }
   }
 
+  function renderFormCard(form) {
+    const status = publishStatus(form)
+    return (
+      <Card key={form.id} className="flex flex-col justify-between">
+        <div>
+          <h2 className="mb-1 text-lg font-semibold">{form.title}</h2>
+          {form.description && (
+            <p className="mb-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{form.description}</p>
+          )}
+          <div className="mb-3 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+              {countQuestions(form)} questions
+            </span>
+            {form.brand && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 dark:border-slate-700/50"
+                title="This form has its own custom branding"
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: form.brand.colors?.[500] ?? '#6366f1' }}
+                />
+                Custom branding
+              </span>
+            )}
+            {hasBackend() && (
+              <span className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${STATUS_BADGE[status]}`}>
+                {STATUS_LABEL[status]}
+              </span>
+            )}
+            <span>Updated {formatDate(form.updatedAt)}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => onOpenBuilder(form.id)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => onOpenPreview(form.id)}>
+            Preview
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => onOpenFill(form.id)}>
+            Fill Out
+          </Button>
+          <Menu label="⋯ More">
+            <MenuItem onClick={() => onOpenSettings(form.id)}>Settings</MenuItem>
+            <MenuItem onClick={() => onOpenResponses(form.id)}>Responses</MenuItem>
+            {hasBackend() && (
+              <>
+                <MenuItem onClick={() => handlePublish(form)} disabled={publishingId === form.id}>
+                  {publishingId === form.id ? 'Working…' : status === 'draft' ? 'Publish' : 'Republish'}
+                </MenuItem>
+                {status !== 'draft' && (
+                  <>
+                    <MenuItem onClick={() => handleCopyLink(form)}>{copiedId === form.id ? 'Link copied' : 'Copy link'}</MenuItem>
+                    <MenuItem danger onClick={() => setPendingUnpublish(form)} disabled={publishingId === form.id}>
+                      Unpublish
+                    </MenuItem>
+                  </>
+                )}
+              </>
+            )}
+            <MenuItem onClick={() => handleDuplicate(form.id)}>Duplicate</MenuItem>
+            <MenuItem onClick={() => handleExport(form)}>Export .form.json</MenuItem>
+            <MenuItem danger onClick={() => setPendingDelete(form)}>
+              Delete
+            </MenuItem>
+          </Menu>
+        </div>
+      </Card>
+    )
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-24 text-sm text-slate-500 dark:text-slate-400">Loading forms…</div>
   }
@@ -224,7 +326,7 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
             Import from Markdown
           </Button>
           <Button variant="secondary" onClick={handleImportClick}>
-            Import from file
+            Import .form.json
           </Button>
           <Button onClick={handleCreate}>+ Create New Form</Button>
         </div>
@@ -247,82 +349,16 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
 
       {forms.length === 0 ? (
         <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
-          No forms yet. Create one, or import a form from a markdown doc or a JSON file.
+          No forms yet. Create one, or import a form from a markdown doc or a .form.json export.
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {forms.map((form) => {
-            const status = publishStatus(form)
-            return (
-              <Card key={form.id} className="flex flex-col justify-between">
-                <div>
-                  <h2 className="mb-1 text-lg font-semibold">{form.title}</h2>
-                  {form.description && (
-                    <p className="mb-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{form.description}</p>
-                  )}
-                  <div className="mb-3 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="rounded-full bg-brand-100 px-2 py-0.5 font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                      {countQuestions(form)} questions
-                    </span>
-                    {form.brand && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 dark:border-slate-700/50"
-                        title="This form has its own custom branding"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: form.brand.colors?.[500] ?? '#6366f1' }}
-                        />
-                        Custom branding
-                      </span>
-                    )}
-                    {hasBackend() && (
-                      <span className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${STATUS_BADGE[status]}`}>
-                        {STATUS_LABEL[status]}
-                      </span>
-                    )}
-                    <span>Updated {formatDate(form.updatedAt)}</span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" onClick={() => onOpenBuilder(form.id)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={() => onOpenPreview(form.id)}>
-                    Preview
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={() => onOpenFill(form.id)}>
-                    Fill Out
-                  </Button>
-                  <Menu label="⋯ More">
-                    <MenuItem onClick={() => onOpenSettings(form.id)}>Settings</MenuItem>
-                    <MenuItem onClick={() => onOpenResponses(form.id)}>Responses</MenuItem>
-                    {hasBackend() && (
-                      <>
-                        <MenuItem onClick={() => handlePublish(form)} disabled={publishingId === form.id}>
-                          {publishingId === form.id ? 'Working…' : status === 'draft' ? 'Publish' : 'Republish'}
-                        </MenuItem>
-                        {status !== 'draft' && (
-                          <>
-                            <MenuItem onClick={() => handleCopyLink(form)}>{copiedId === form.id ? 'Link copied' : 'Copy link'}</MenuItem>
-                            <MenuItem danger onClick={() => setPendingUnpublish(form)} disabled={publishingId === form.id}>
-                              Unpublish
-                            </MenuItem>
-                          </>
-                        )}
-                      </>
-                    )}
-                    <MenuItem onClick={() => handleDuplicate(form.id)}>Duplicate</MenuItem>
-                    <MenuItem onClick={() => handleExport(form)}>Export</MenuItem>
-                    <MenuItem danger onClick={() => setPendingDelete(form)}>
-                      Delete
-                    </MenuItem>
-                  </Menu>
-                </div>
-              </Card>
-            )
-          })}
+        <div className="space-y-8">
+          {groupByProject(forms).map(([project, projectForms]) => (
+            <div key={project}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{project}</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{projectForms.map(renderFormCard)}</div>
+            </div>
+          ))}
         </div>
       )}
 

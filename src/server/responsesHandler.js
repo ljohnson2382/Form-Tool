@@ -1,4 +1,4 @@
-import { listResponsesFor, appendResponse } from './blobStore.js'
+import * as blobStore from './blobStore.js'
 import { applyCors } from './cors.js'
 
 /**
@@ -7,8 +7,12 @@ import { applyCors } from './cors.js'
  * no prior relationship with this backend to authenticate. GET (used by the
  * admin Responses screen to read submissions) requires `x-admin-token`,
  * since responses are the one thing here that shouldn't be world-readable.
+ *
+ * `store` — any object implementing listResponsesFor/appendResponse (see
+ * blobStore.js or cosmosStore.js). Defaults to blobStore so existing
+ * Vercel-only consumers are unaffected.
  */
-export function createResponsesHandler({ adminToken, allowedOrigin } = {}) {
+export function createResponsesHandler({ adminToken, allowedOrigin, store = blobStore } = {}) {
   return async function responsesHandler(req, res) {
     applyCors(res, { allowedOrigin, methods: 'GET,POST,OPTIONS' })
     if (req.method === 'OPTIONS') return res.status(204).end()
@@ -18,7 +22,7 @@ export function createResponsesHandler({ adminToken, allowedOrigin } = {}) {
       if (!formId || typeof answers !== 'object' || answers === null) {
         return res.status(400).json({ error: 'Expected { formId, answers }.' })
       }
-      const response = await appendResponse(formId, answers)
+      const response = await store.appendResponse(formId, answers)
       return res.status(201).json(response)
     }
 
@@ -28,7 +32,7 @@ export function createResponsesHandler({ adminToken, allowedOrigin } = {}) {
       }
       const formId = req.query?.formId
       if (!formId) return res.status(400).json({ error: 'Missing "formId" query param.' })
-      const responses = await listResponsesFor(formId)
+      const responses = await store.listResponsesFor(formId)
       return res.status(200).json(responses)
     }
 

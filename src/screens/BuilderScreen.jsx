@@ -129,6 +129,12 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           value={form.description ?? ''}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
+        <input
+          className={`${inputClass} text-sm`}
+          placeholder="Project (optional, e.g. itzipper)"
+          value={form.projectId ?? ''}
+          onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+        />
       </div>
 
       <div ref={brandSectionRef} className="mb-4 scroll-mt-24">
