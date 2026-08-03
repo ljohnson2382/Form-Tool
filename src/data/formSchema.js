@@ -152,6 +152,7 @@ export function createEmptyForm(title = 'Untitled Form') {
     id: createId('form'),
     title,
     description: '',
+    projectId: null,
     createdAt: now,
     updatedAt: now,
     sections: [createSection('Section 1')],

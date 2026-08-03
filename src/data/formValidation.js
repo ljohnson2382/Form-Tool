@@ -20,6 +20,15 @@ function toText(value, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
 
+// A form with no project set is a real, valid state (a draft that hasn't
+// been organized yet) — unlike the other text fields here, empty means
+// "unset" rather than "blank string", so this normalizes to `null` instead
+// of `''`. Same shape as formSchema.js's own toNullableText, used for the
+// optional brand fields.
+function toNullableText(value) {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
 function normalizeItem(item) {
   if (!item || typeof item !== 'object') return null
 
@@ -96,6 +105,7 @@ export function normalizeForm(raw, { strict = false } = {}) {
     id: toText(raw.id) || createId('form'),
     title: toText(raw.title, 'Untitled Form'),
     description: toText(raw.description),
+    projectId: toNullableText(raw.projectId),
     createdAt: toText(raw.createdAt) || now,
     updatedAt: toText(raw.updatedAt) || now,
     sections: (Array.isArray(raw.sections) ? raw.sections : []).map(normalizeSection).filter(Boolean),

@@ -24,7 +24,10 @@ function downloadBlob(blob, suggestedName) {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  // Revoking immediately races the browser actually reading the blob for
+  // the download in some engines, producing an empty/truncated file —
+  // defer it to the next tick so the download has already started.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 function downloadJson(data, suggestedName) {
@@ -51,7 +54,12 @@ export async function saveJsonToFile(data, suggestedName) {
       return 'saved'
     } catch (error) {
       if (error?.name === 'AbortError') return 'cancelled'
-      throw error
+      // NotAllowedError (and anything else) means the native picker itself
+      // failed for an environmental reason — lost focus, a permissions
+      // policy, a browser quirk — not that the user declined. Fall back to
+      // a plain download rather than silently producing nothing.
+      downloadJson(data, filename)
+      return 'saved'
     }
   }
 
@@ -84,7 +92,8 @@ export async function saveJsxToFile(code, suggestedName) {
       return 'saved'
     } catch (error) {
       if (error?.name === 'AbortError') return 'cancelled'
-      throw error
+      downloadBlob(new Blob([code], { type: 'text/javascript' }), filename)
+      return 'saved'
     }
   }
 
@@ -106,6 +115,9 @@ export async function openJsonFile() {
       return JSON.parse(await file.text())
     } catch (error) {
       if (error?.name === 'AbortError') return null
+      // NotAllowedError etc. — the native picker failed to even open, not
+      // that the user declined. Let it propagate so the caller can fall
+      // back to the <input type=file> picker instead of doing nothing.
       throw error
     }
   }

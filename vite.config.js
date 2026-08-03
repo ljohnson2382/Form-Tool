@@ -19,9 +19,10 @@ export default defineConfig({
       // The server entry is Node-only (Vercel serverless functions) and has
       // no business being bundled into the browser build, or vice versa —
       // both entries share this external list since Rollup doesn't scope it
-      // per-entry, but React never appears in src/server/ and @vercel/blob
-      // never appears in the browser entry, so this is inert either way.
-      external: ['react', 'react-dom', 'react/jsx-runtime', '@vercel/blob'],
+      // per-entry, but React never appears in src/server/ and
+      // @vercel/blob/@azure/cosmos never appear in the browser entry, so
+      // this is inert either way.
+      external: ['react', 'react-dom', 'react/jsx-runtime', '@vercel/blob', '@azure/cosmos'],
     },
   },
 })
