@@ -1,0 +1,36 @@
+{
+  "name": "form-builder-kit",
+  "version": "0.1.0",
+  "description": "Embeddable Microsoft Forms-style form/survey builder — brandable, storage-agnostic, drop into any React project.",
+  "type": "module",
+  "main": "./dist/form-builder-kit.js",
+  "module": "./dist/form-builder-kit.js",
+  "exports": {
+    ".": "./dist/form-builder-kit.js",
+    "./style.css": "./dist/form-builder-kit.css",
+    "./server": "./dist/form-builder-kit-server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "prepare": "vite build"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "@vercel/blob": "^2.6.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.1.1"
+  }
+}
