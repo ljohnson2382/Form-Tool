@@ -1,0 +1,14 @@
+{
+  "name": "form-builder-kit",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./style.css": "./style.css",
+    "./dist/style.css": "./style.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
