@@ -4,6 +4,8 @@ import SectionEditor from '../components/builder/SectionEditor'
 import BrandEditor from '../components/builder/BrandEditor'
 import { getForm, saveForm } from '../utils/formStore'
 import { createSection } from '../data/formSchema'
+import { generateFormComponent, suggestedComponentFilename } from '../utils/generateFormComponent'
+import { saveJsxToFile } from '../utils/fileStorage'
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
@@ -11,6 +13,7 @@ const inputClass =
 export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false }) {
   const [form, setForm] = useState(null)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
+  const [deployState, setDeployState] = useState('idle') // idle | deploying | deployed
   const brandSectionRef = useRef(null)
 
   useEffect(() => {
@@ -72,6 +75,19 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
     setTimeout(() => setSaveState('idle'), 1500)
   }
 
+  // Generates a standalone component from the form as it currently stands
+  // in the editor (including unsaved edits — same as Preview already
+  // reflects live state) and saves it via the native picker, so it can be
+  // dropped straight into this or any other React project's src/. See
+  // utils/generateFormComponent.js.
+  async function handleDeploy() {
+    setDeployState('deploying')
+    const code = generateFormComponent(form)
+    const result = await saveJsxToFile(code, suggestedComponentFilename(form))
+    setDeployState(result === 'saved' ? 'deployed' : 'idle')
+    if (result === 'saved') setTimeout(() => setDeployState('idle'), 1500)
+  }
+
   if (!form) {
     return <div className="flex items-center justify-center py-24 text-sm text-slate-500 dark:text-slate-400">Loading form…</div>
   }
@@ -89,6 +105,9 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           </Button>
           <Button variant="secondary" onClick={() => onPreview(form.id)}>
             Preview
+          </Button>
+          <Button variant="secondary" onClick={handleDeploy} disabled={deployState === 'deploying'}>
+            {deployState === 'deploying' ? 'Deploying…' : deployState === 'deployed' ? 'Deployed' : 'Deploy'}
           </Button>
           <Button onClick={handleSave} disabled={saveState === 'saving'}>
             {saveState === 'saving' ? 'Saving…' : 'Save'}

@@ -11,9 +11,6 @@ export const defaultBrand = {
   backgroundDark: null,
   backgroundColorLight: null,
   backgroundColorDark: null,
-  // Unset by default — falls back to the auto-derived `colors[700]` shade
-  // (see styles.css's --color-brand-secondary) until a brand picks its own.
-  secondaryColor: null,
   colors: {
     50: '#eef2ff',
     100: '#e0e7ff',
@@ -82,25 +79,13 @@ export function BrandProvider({ brand, children }) {
   // so a per-form override doesn't leak once its screen is left.
   useEffect(() => {
     const root = document.documentElement
-
-    function applySecondary(value) {
-      // Removing (rather than setting to some JS-computed fallback) is what
-      // lets --color-brand-secondary's own CSS fallback chain do its job —
-      // see styles.css.
-      if (value) root.style.setProperty('--fb-brand-secondary', value)
-      else root.style.removeProperty('--fb-brand-secondary')
-    }
-
     for (const [shade, value] of Object.entries(merged.colors)) {
       root.style.setProperty(`--fb-brand-${shade}`, value)
     }
-    applySecondary(merged.secondaryColor)
-
     return () => {
       for (const [shade, value] of Object.entries(inherited.colors)) {
         root.style.setProperty(`--fb-brand-${shade}`, value)
       }
-      applySecondary(inherited.secondaryColor)
     }
   }, [merged, inherited])
 

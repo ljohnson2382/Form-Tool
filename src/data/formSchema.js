@@ -105,9 +105,6 @@ export function normalizeBrand(brand) {
     // PageBackground.jsx for how the two combine.
     backgroundColorLight: toNullableText(brand.backgroundColorLight),
     backgroundColorDark: toNullableText(brand.backgroundColorDark),
-    // Independent of `colors[700]` — see styles.css's --color-brand-secondary
-    // fallback chain and Button.jsx's secondary variant.
-    secondaryColor: toNullableText(brand.secondaryColor),
     colors,
   }
 

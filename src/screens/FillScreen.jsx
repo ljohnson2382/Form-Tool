@@ -6,14 +6,24 @@ import { getForm } from '../utils/formStore'
 import { validateResponses, sectionsOf, itemsOf } from '../data/formSchema'
 import { submitResponse } from '../utils/responseStore'
 
-export default function FillScreen({ formId, onBack, onBrandLoaded }) {
-  const [form, setForm] = useState(null)
+// `form` — pass a form object directly to skip the IndexedDB lookup
+// entirely. This is what makes a form portable outside the admin app: see
+// utils/generateFormComponent.js, which generates a standalone component
+// carrying its form's data this way, since a different React project's
+// IndexedDB has no way to already have this form seeded into it.
+export default function FillScreen({ formId, form: providedForm, onBack, onBrandLoaded }) {
+  const [form, setForm] = useState(providedForm ?? null)
   const [answers, setAnswers] = useState({})
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
+    if (providedForm) {
+      setForm(providedForm)
+      onBrandLoaded?.(providedForm.brand ?? null)
+      return
+    }
     let cancelled = false
     setLoadFailed(false)
     getForm(formId)
@@ -33,7 +43,7 @@ export default function FillScreen({ formId, onBack, onBrandLoaded }) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formId])
+  }, [formId, providedForm])
 
   function setAnswer(itemId, value) {
     setAnswers((prev) => ({ ...prev, [itemId]: value }))

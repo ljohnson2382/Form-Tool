@@ -62,11 +62,14 @@ export {
   supportsFileSystemAccess,
   saveJsonToFile,
   suggestedFormFilename,
+  saveJsxToFile,
   openJsonFile,
   readJsonFromInputFile,
   openMarkdownFile,
   readTextFromInputFile,
 } from './utils/fileStorage.js'
+
+export { generateFormComponent, suggestedComponentFilename } from './utils/generateFormComponent.js'
 
 export { parseMarkdownToForm } from './utils/markdownImport.js'
 

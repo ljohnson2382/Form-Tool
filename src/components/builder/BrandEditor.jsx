@@ -17,7 +17,6 @@ function fieldsFromBrand(brand) {
     backgroundDark: brand?.backgroundDark ?? '',
     backgroundColorLight: brand?.backgroundColorLight ?? '',
     backgroundColorDark: brand?.backgroundColorDark ?? '',
-    secondaryColor: brand?.secondaryColor ?? '',
   }
 }
 
@@ -78,7 +77,6 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
             backgroundDark: '',
             backgroundColorLight: '',
             backgroundColorDark: '',
-            secondaryColor: '',
             colors: {},
           }
         : null,
@@ -208,18 +206,6 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
               onChange={(e) => updateColor(e.target.value)}
             />
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Fills primary buttons (Save, Submit).</p>
-          </div>
-          <ColorField
-            label="Secondary button color"
-            placeholder="Auto (derived from accent)"
-            value={fields.secondaryColor}
-            onChange={(value) => updateField('secondaryColor', value)}
-          />
-          <div className="sm:col-span-2">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Sets the border/text for outline buttons (Preview, Cancel, Export). Left blank, it's derived from the accent color —
-              set this directly if that auto-derived shade doesn't read well against your accent.
-            </p>
           </div>
         </div>
       )}

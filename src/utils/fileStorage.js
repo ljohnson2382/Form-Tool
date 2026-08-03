@@ -16,8 +16,7 @@ function slugifyFilename(name) {
   )
 }
 
-function downloadJson(data, suggestedName) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+function downloadBlob(blob, suggestedName) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -26,6 +25,10 @@ function downloadJson(data, suggestedName) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+function downloadJson(data, suggestedName) {
+  downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), suggestedName)
 }
 
 /**
@@ -58,6 +61,35 @@ export async function saveJsonToFile(data, suggestedName) {
 
 export function suggestedFormFilename(form) {
   return `${slugifyFilename(form.title)}.form.json`
+}
+
+/**
+ * Saves generated source code (a .jsx string) to disk — same native-picker-
+ * with-download-fallback shape as saveJsonToFile, letting the user navigate
+ * to any folder (e.g. their project's src/components/) in the picker. Used
+ * by BuilderScreen.jsx's Deploy button; see utils/generateFormComponent.js.
+ */
+export async function saveJsxToFile(code, suggestedName) {
+  const filename = suggestedName.endsWith('.jsx') ? suggestedName : `${suggestedName}.jsx`
+
+  if (supportsFileSystemAccess) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'React component', accept: { 'text/javascript': ['.jsx'] } }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(code)
+      await writable.close()
+      return 'saved'
+    } catch (error) {
+      if (error?.name === 'AbortError') return 'cancelled'
+      throw error
+    }
+  }
+
+  downloadBlob(new Blob([code], { type: 'text/javascript' }), filename)
+  return 'saved'
 }
 
 /**
