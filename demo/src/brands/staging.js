@@ -1,19 +1,22 @@
-// The active brand for this demo — a placeholder "staging" identity so the
-// app isn't visually tied to any one project while the kit itself is under
-// development. Swap this for a real project's brand (see brands/itzipper.js
-// for what that looks like) or pass a different config entirely.
+// The app-level default — deliberately generic (standard blue, no logo, no
+// background image) so it never looks like it belongs to any one client.
+// No backgroundLight/backgroundDark means PageBackground.jsx's fallback
+// applies: near-white in light mode, near-black in dark mode. Individual
+// forms carry their own look instead (see brands/itzipper.js, applied to
+// seeds/itzipperUatSurvey.js's `brand` field — or the Builder's "Customize
+// branding for this form" toggle for anything created in the app).
 export const stagingBrand = {
-  appName: 'Staging Forms',
+  appName: 'Form Designer',
   colors: {
-    50: '#f5f3ff',
-    100: '#ede9fe',
-    200: '#ddd6fe',
-    300: '#c4b5fd',
-    400: '#a78bfa',
-    500: '#8b5cf6',
-    600: '#7c3aed',
-    700: '#6d28d9',
-    800: '#5b21b6',
-    900: '#4c1d95',
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#3b82f6',
+    600: '#2563eb',
+    700: '#1d4ed8',
+    800: '#1e40af',
+    900: '#1e3a8a',
   },
 }

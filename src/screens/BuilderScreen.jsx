@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Button from '../components/common/Button'
 import SectionEditor from '../components/builder/SectionEditor'
+import BrandEditor from '../components/builder/BrandEditor'
 import { getForm, saveForm } from '../utils/formStore'
 import { createSection } from '../data/formSchema'
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
 
-export default function BuilderScreen({ formId, onBack, onPreview }) {
+export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false }) {
   const [form, setForm] = useState(null)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
+  const brandSectionRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -20,6 +22,25 @@ export default function BuilderScreen({ formId, onBack, onPreview }) {
       cancelled = true
     }
   }, [formId])
+
+  // Fires on load and on every edit, so the Branding panel previews live in
+  // the surrounding chrome (header/background) instead of only after Save.
+  useEffect(() => {
+    onBrandLoaded?.(form?.brand ?? null)
+  }, [form?.brand, onBrandLoaded])
+
+  // Jumps straight to the branding panel — used by the Dashboard's "⋯ More
+  // → Settings" entry, so it doesn't leave you to scroll past every section
+  // to find it on a long form.
+  useEffect(() => {
+    if (form && focusBrand) brandSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Only on the form's initial load for this mount, not on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(form)])
+
+  function scrollToBrand() {
+    brandSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   function updateSection(index, updatedSection) {
     const sections = [...form.sections]
@@ -63,6 +84,9 @@ export default function BuilderScreen({ formId, onBack, onPreview }) {
         </Button>
         <div className="flex items-center gap-2">
           {saveState === 'saved' && <span className="text-sm text-slate-500 dark:text-slate-400">Saved</span>}
+          <Button variant="secondary" onClick={scrollToBrand}>
+            ⚙ Settings
+          </Button>
           <Button variant="secondary" onClick={() => onPreview(form.id)}>
             Preview
           </Button>
@@ -86,6 +110,10 @@ export default function BuilderScreen({ formId, onBack, onPreview }) {
           value={form.description ?? ''}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
+      </div>
+
+      <div ref={brandSectionRef} className="mb-4 scroll-mt-24">
+        <BrandEditor brand={form.brand} onChange={(brand) => setForm({ ...form, brand })} detectedBrands={detectedBrands} />
       </div>
 
       <div className="space-y-4">

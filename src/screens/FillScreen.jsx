@@ -6,7 +6,7 @@ import { getForm } from '../utils/formStore'
 import { validateResponses, sectionsOf, itemsOf } from '../data/formSchema'
 import { submitResponse } from '../utils/responseStore'
 
-export default function FillScreen({ formId, onBack }) {
+export default function FillScreen({ formId, onBack, onBrandLoaded }) {
   const [form, setForm] = useState(null)
   const [answers, setAnswers] = useState({})
   const [errors, setErrors] = useState({})
@@ -19,8 +19,12 @@ export default function FillScreen({ formId, onBack }) {
     getForm(formId)
       .then((loaded) => {
         if (cancelled) return
-        if (loaded) setForm(loaded)
-        else setLoadFailed(true)
+        if (loaded) {
+          setForm(loaded)
+          onBrandLoaded?.(loaded.brand ?? null)
+        } else {
+          setLoadFailed(true)
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadFailed(true)
@@ -28,6 +32,7 @@ export default function FillScreen({ formId, onBack }) {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formId])
 
   function setAnswer(itemId, value) {

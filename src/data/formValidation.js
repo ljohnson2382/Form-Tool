@@ -5,7 +5,7 @@
 // the re-render, the crash repeated on every reload with no UI left to delete
 // the offending form.
 
-import { QUESTION_TYPES, createId, normalizeScale, normalizeOptions } from './formSchema.js'
+import { QUESTION_TYPES, createId, normalizeScale, normalizeOptions, normalizeBrand } from './formSchema.js'
 
 export class FormValidationError extends Error {
   constructor(message) {
@@ -80,7 +80,7 @@ export function normalizeForm(raw, { strict = false } = {}) {
 
   if (!isPlainObject) {
     if (strict) throw new FormValidationError('That file doesn’t contain a form — expected a JSON object.')
-    return { id: createId('form'), title: 'Unreadable form', description: '', createdAt: now, updatedAt: now, sections: [] }
+    return { id: createId('form'), title: 'Unreadable form', description: '', createdAt: now, updatedAt: now, sections: [], brand: null }
   }
 
   if (strict) {
@@ -99,5 +99,6 @@ export function normalizeForm(raw, { strict = false } = {}) {
     createdAt: toText(raw.createdAt) || now,
     updatedAt: toText(raw.updatedAt) || now,
     sections: (Array.isArray(raw.sections) ? raw.sections : []).map(normalizeSection).filter(Boolean),
+    brand: normalizeBrand(raw.brand),
   }
 }

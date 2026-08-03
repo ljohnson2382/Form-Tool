@@ -16,6 +16,14 @@
   --color-brand-700: var(--fb-brand-700, #4338ca);
   --color-brand-800: var(--fb-brand-800, #3730a3);
   --color-brand-900: var(--fb-brand-900, #312e81);
+  /* Falls back to the auto-derived 700 shade until a brand explicitly sets
+     its own — see BrandEditor.jsx's "Secondary button color" field. Because
+     both tokens are declared here, at :root, this fallback chain resolves
+     correctly (custom-property var() substitution happens at the element
+     where the property is *declared*, not used — see the longer comment in
+     BrandContext.jsx for why that distinction broke Tailwind's utility
+     classes before everything was moved to be set on :root). */
+  --color-brand-secondary: var(--fb-brand-secondary, var(--color-brand-700));
 }
 
 body {

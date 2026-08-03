@@ -10,6 +10,8 @@ export { default as DashboardScreen } from './screens/DashboardScreen.jsx'
 export { default as BuilderScreen } from './screens/BuilderScreen.jsx'
 export { default as PreviewScreen } from './screens/PreviewScreen.jsx'
 export { default as FillScreen } from './screens/FillScreen.jsx'
+export { default as ResponsesScreen } from './screens/ResponsesScreen.jsx'
+export { default as AdminSettingsScreen } from './screens/AdminSettingsScreen.jsx'
 
 export {
   QUESTION_TYPES,
@@ -24,6 +26,7 @@ export {
   validateResponses,
   normalizeScale,
   normalizeOptions,
+  normalizeBrand,
   sectionsOf,
   itemsOf,
 } from './data/formSchema.js'
@@ -31,8 +34,21 @@ export {
 export { normalizeForm, FormValidationError } from './data/formValidation.js'
 
 export { configureStorage } from './utils/db.js'
+export { configureBackend } from './utils/backendConfig.js'
+export { parseDetectedBrands } from './utils/brandAssets.js'
+export { getAppBrand, saveAppBrand } from './utils/appSettings.js'
 
-export { listForms, getForm, saveForm, deleteForm, duplicateForm, importForm, seedIfEmpty } from './utils/formStore.js'
+export {
+  listForms,
+  getForm,
+  saveForm,
+  deleteForm,
+  duplicateForm,
+  importForm,
+  seedIfEmpty,
+  publishForm,
+  unpublishForm,
+} from './utils/formStore.js'
 
 export {
   submitResponse,

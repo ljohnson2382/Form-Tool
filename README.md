@@ -182,3 +182,105 @@ using the form.
   record. Save/open to disk (including a synced cloud folder) uses the File
   System Access API with a download/upload fallback for browsers that don't
   support it (Safari, Firefox).
+
+## Publishing across a subdomain (real backend)
+
+The admin app and a fill-mode mount can be deployed to two different
+origins — e.g. the builder at `staging.itzipper.com`, respondents sent to
+`forms.itzipper.com` — but two origins share no IndexedDB. For that to work,
+both need to point at the same backend instead of the browser's local
+storage:
+
+```jsx
+<FormBuilderApp
+  brand={myBrand}
+  apiBaseUrl="https://staging.itzipper.com/api"
+  adminToken={import.meta.env.VITE_ADMIN_TOKEN} // admin mount only — never on a fill mount
+  fillBaseUrl="https://forms.itzipper.com"        // used to build the "Copy link" URL
+/>
+```
+
+`apiBaseUrl` switches `formStore`/`responseStore` from IndexedDB to HTTP
+calls against that contract (`GET/POST/DELETE /forms`, `GET/POST
+/responses`). With no `apiBaseUrl`, nothing here applies — both apps keep
+working exactly as they do today, local-only.
+
+### Publish lifecycle
+
+Once a backend is configured, each form on the Dashboard shows its status —
+**Draft** (never published), **Published** (the live copy matches your
+latest save), or **Unpublished changes** (you've edited since the live copy
+went out) — and the actions to go with it: **Publish**/**Republish**, **Copy
+link**, **Unpublish** (takes the fill link down; collected responses are
+kept), and **Responses** (lists every submission, reusing the same
+read-only question rendering as Preview).
+
+### Reference server (`form-builder-kit/server`)
+
+A ready-to-use implementation of that HTTP contract, built on
+[Vercel Blob](https://vercel.com/docs/storage/vercel-blob) — storage for
+this is deliberately just JSON files (`forms/<id>.json`,
+`responses/<formId>.json`), swappable later by changing
+`src/server/blobStore.js` alone. Wire it into any Vercel project's `api/`
+folder in a few lines (see `demo/api/forms.js` / `demo/api/responses.js`
+for the working example this repo deploys):
+
+```js
+// api/forms.js
+import { createFormsHandler } from 'form-builder-kit/server'
+
+export default createFormsHandler({
+  adminToken: process.env.ADMIN_API_TOKEN,
+  allowedOrigin: process.env.FILL_APP_ORIGIN,
+})
+```
+
+```js
+// api/responses.js
+import { createResponsesHandler } from 'form-builder-kit/server'
+
+export default createResponsesHandler({
+  adminToken: process.env.ADMIN_API_TOKEN,
+  allowedOrigin: process.env.FILL_APP_ORIGIN,
+})
+```
+
+**Security note**: publishing a form and reading its responses are gated by
+one shared-secret header (`x-admin-token`, checked against
+`ADMIN_API_TOKEN`) rather than a real login system — the admin app's own
+browser bundle carries this secret (as `VITE_ADMIN_TOKEN`), so it's visible
+to anyone who opens devtools on that app. That's a real limitation, fine for
+an internal UAT tool, not sufficient once this holds anything sensitive.
+Submitting a response has no auth at all, since an anonymous respondent has
+no prior relationship with the backend to authenticate.
+
+### `fill/` — the respondent-only deploy
+
+`fill/` (sibling to `demo/`) is a minimal app with one job: mount
+`FormBuilderApp` in `fill` mode and nothing else. It has no admin token
+anywhere in its build — that's the whole point of it being a separate
+deploy from the admin app.
+
+### Deployment runbook (Vercel + Azure DNS)
+
+For a project on Vercel with DNS on Azure DNS Zone (not Vercel-managed), so
+attaching a subdomain is a manual DNS record rather than a dashboard click:
+
+1. Push the repo to GitHub. In Vercel, create **project #1** from it with
+   root directory `demo/` — this is the admin app.
+2. Vercel dashboard → **Storage** → create a Blob store, then add to
+   project #1's env vars: the generated `BLOB_READ_WRITE_TOKEN`, a
+   generated `ADMIN_API_TOKEN` (any long random string), the same value
+   again as `VITE_ADMIN_TOKEN`, and `FILL_APP_ORIGIN=https://forms.itzipper.com`.
+3. Create **project #2** from the same repo with root directory `fill/` —
+   the respondent app. Env var: `VITE_API_BASE_URL=https://staging.itzipper.com/api`.
+4. In each Vercel project, add its custom domain (`staging.itzipper.com` for
+   project #1, `forms.itzipper.com` for project #2) — Vercel shows the CNAME
+   target to point at.
+5. In Azure DNS Zone for `itzipper.com`, add two CNAME records (`staging`,
+   `forms`) pointing at those Vercel-provided targets. Vercel auto-verifies
+   once DNS propagates and issues TLS certificates for both.
+
+Locally, `vercel dev` (Vercel CLI) runs the `api/` functions so
+`VITE_API_BASE_URL=http://localhost:3000/api` works against `demo`/`fill`
+running on their own Vite dev ports, without deploying anything.

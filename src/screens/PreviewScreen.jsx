@@ -7,7 +7,7 @@ import { getForm } from '../utils/formStore'
 import { sectionsOf, itemsOf } from '../data/formSchema'
 import { listResponses, exportResponsesToFile, deleteResponsesForForm } from '../utils/responseStore'
 
-export default function PreviewScreen({ formId, onBack, onFill }) {
+export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandLoaded }) {
   const [form, setForm] = useState(null)
   const [responseCount, setResponseCount] = useState(0)
   const [exportState, setExportState] = useState('idle')
@@ -23,6 +23,7 @@ export default function PreviewScreen({ formId, onBack, onFill }) {
     getForm(formId).then((loaded) => {
       if (cancelled) return
       setForm(loaded)
+      onBrandLoaded?.(loaded?.brand ?? null)
       listResponses(formId).then((responses) => {
         if (!cancelled) setResponseCount(responses.length)
       })
@@ -30,6 +31,9 @@ export default function PreviewScreen({ formId, onBack, onFill }) {
     return () => {
       cancelled = true
     }
+    // onBrandLoaded is a setState function from the parent shell — stable
+    // across renders, and re-running this on every render would refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formId])
 
   async function handleExport() {
@@ -58,6 +62,9 @@ export default function PreviewScreen({ formId, onBack, onFill }) {
           ← Back to Dashboard
         </Button>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => onEdit(form.id)}>
+            Edit
+          </Button>
           <Button variant="secondary" onClick={handleExport} disabled={responseCount === 0 || exportState === 'exporting'}>
             {exportState === 'exporting' ? 'Exporting…' : `Export ${responseCount} Response${responseCount === 1 ? '' : 's'}`}
           </Button>

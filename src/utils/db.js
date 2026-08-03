@@ -1,5 +1,5 @@
 const BASE_DB_NAME = 'form-builder-db'
-const DB_VERSION = 1
+const DB_VERSION = 3
 
 let dbName = BASE_DB_NAME
 let dbPromise = null
@@ -39,6 +39,20 @@ export function openDb() {
       if (!db.objectStoreNames.contains('responses')) {
         const store = db.createObjectStore('responses', { keyPath: 'id' })
         store.createIndex('formId', 'formId', { unique: false })
+      }
+      // Publish status lives separately from the form record itself rather
+      // than as a field on it — normalizeForm strips unknown fields at the
+      // storage boundary (see formValidation.js), and a form's own JSON
+      // shape is also what gets exported/imported/sent to the backend, none
+      // of which should carry this admin's local publish bookkeeping.
+      if (!db.objectStoreNames.contains('publishState')) {
+        db.createObjectStore('publishState', { keyPath: 'formId' })
+      }
+      // A single record holding the admin app's own brand override — see
+      // utils/appSettings.js. Separate from any one form's record since it
+      // isn't scoped to a form at all.
+      if (!db.objectStoreNames.contains('appSettings')) {
+        db.createObjectStore('appSettings', { keyPath: 'id' })
       }
     }
     request.onsuccess = () => resolve(request.result)

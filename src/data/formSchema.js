@@ -73,6 +73,48 @@ export function normalizeOptions(options) {
   return Array.isArray(options) ? options.filter((option) => typeof option === 'string') : []
 }
 
+const BRAND_COLOR_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+
+function toNullableText(value) {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+/**
+ * A form's own optional custom brand (same shape as the app-level brand
+ * config in BrandContext.jsx) — same "repair, don't throw" style as
+ * normalizeScale/normalizeOptions. A brand with nothing meaningful set
+ * normalizes to `null`, which is the same as the form not having one.
+ */
+export function normalizeBrand(brand) {
+  if (!brand || typeof brand !== 'object') return null
+
+  const colorsSource = brand.colors && typeof brand.colors === 'object' ? brand.colors : {}
+  const colors = {}
+  for (const shade of BRAND_COLOR_SHADES) {
+    const value = colorsSource[shade]
+    if (typeof value === 'string' && value.trim()) colors[shade] = value
+  }
+
+  const normalized = {
+    appName: toNullableText(brand.appName),
+    logoLight: toNullableText(brand.logoLight),
+    logoDark: toNullableText(brand.logoDark),
+    backgroundLight: toNullableText(brand.backgroundLight),
+    backgroundDark: toNullableText(brand.backgroundDark),
+    // A solid fill, independent of the image fields above — see
+    // PageBackground.jsx for how the two combine.
+    backgroundColorLight: toNullableText(brand.backgroundColorLight),
+    backgroundColorDark: toNullableText(brand.backgroundColorDark),
+    // Independent of `colors[700]` — see styles.css's --color-brand-secondary
+    // fallback chain and Button.jsx's secondary variant.
+    secondaryColor: toNullableText(brand.secondaryColor),
+    colors,
+  }
+
+  const hasAnything = Object.values(normalized).some((value) => (value && typeof value === 'object' ? Object.keys(value).length > 0 : value !== null))
+  return hasAnything ? normalized : null
+}
+
 /** Safe accessors so a malformed record degrades to "empty" instead of throwing mid-render. */
 export function sectionsOf(form) {
   return Array.isArray(form?.sections) ? form.sections : []
@@ -116,6 +158,7 @@ export function createEmptyForm(title = 'Untitled Form') {
     createdAt: now,
     updatedAt: now,
     sections: [createSection('Section 1')],
+    brand: null,
   }
 }
 
