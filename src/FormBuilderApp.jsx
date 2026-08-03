@@ -39,9 +39,16 @@ function BrandMark({ onClick }) {
   const content = (
     <>
       {logo ? (
-        <img src={logo} alt={brand.appName} className="h-12 w-auto" />
+        // Fixed height, auto width alone shrinks any logo that isn't a wide
+        // horizontal lockup — a stacked icon-over-wordmark composition gets
+        // half its height handed to each row, rendering its text at half
+        // size for no reason tied to image quality. max-w + object-contain
+        // gives every aspect ratio (wide, square, stacked) the same real
+        // estate to work with, capping only pathologically wide logos
+        // instead of shortchanging tall ones.
+        <img src={logo} alt={brand.appName} className="h-14 w-auto max-w-[200px] object-contain" />
       ) : (
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
+        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
           {brand.appName.trim().charAt(0).toUpperCase()}
         </span>
       )}
