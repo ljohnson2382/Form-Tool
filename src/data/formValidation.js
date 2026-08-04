@@ -29,6 +29,11 @@ function toNullableText(value) {
   return typeof value === 'string' && value.trim() ? value : null
 }
 
+function toNullableInteger(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : null
+}
+
 function normalizeItem(item) {
   if (!item || typeof item !== 'object') return null
 
@@ -106,6 +111,20 @@ export function normalizeForm(raw, { strict = false } = {}) {
     title: toText(raw.title, 'Untitled Form'),
     description: toText(raw.description),
     projectId: toNullableText(raw.projectId),
+    // Who this form is for (e.g. "Participant", "Moderator", "Stakeholder")
+    // — freeform, not an enum, so it stays generic across clients. Also
+    // what DashboardScreen.jsx's grouping uses and what "Split into Stages"
+    // (BuilderScreen.jsx) assigns per resulting stage.
+    audience: toNullableText(raw.audience),
+    // Set only on forms produced by "Split into Stages" — link a stage to
+    // the guided sequence it belongs to. seriesIndex/seriesTotal count only
+    // the stages sharing this form's audience (see BuilderScreen.jsx);
+    // nextFormId is null for the last stage in that audience's chain, or
+    // any stage that's the only one for its audience.
+    seriesId: toNullableText(raw.seriesId),
+    seriesIndex: toNullableInteger(raw.seriesIndex),
+    seriesTotal: toNullableInteger(raw.seriesTotal),
+    nextFormId: toNullableText(raw.nextFormId),
     createdAt: toText(raw.createdAt) || now,
     updatedAt: toText(raw.updatedAt) || now,
     sections: (Array.isArray(raw.sections) ? raw.sections : []).map(normalizeSection).filter(Boolean),

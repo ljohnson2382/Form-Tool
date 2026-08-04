@@ -163,6 +163,14 @@ export async function duplicateForm(id) {
     title: `${original.title} (Copy)`,
     createdAt: now,
     updatedAt: now,
+    // A copy is a new standalone form, not actually part of whatever guided
+    // stage sequence the original belonged to — inheriting these would make
+    // the duplicate silently masquerade as another stage in someone else's
+    // chain (or, if the original was mid-chain, orphan the real next stage).
+    seriesId: null,
+    seriesIndex: null,
+    seriesTotal: null,
+    nextFormId: null,
   }
   // saveForm's normalizeForm strips publishedAt (it's not part of the form
   // schema — see the hasBackend() note above), so the copy starts as an
