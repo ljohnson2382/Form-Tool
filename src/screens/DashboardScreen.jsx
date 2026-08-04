@@ -4,7 +4,17 @@ import Card from '../components/common/Card'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import Menu, { MenuItem } from '../components/common/Menu'
 import { createEmptyForm, countQuestions } from '../data/formSchema'
-import { listForms, saveForm, deleteForm, duplicateForm, importForm, publishForm, unpublishForm } from '../utils/formStore'
+import {
+  listForms,
+  saveForm,
+  deleteForm,
+  duplicateForm,
+  importForm,
+  publishForm,
+  unpublishForm,
+  listMigratableForms,
+  migrateFormsToBackend,
+} from '../utils/formStore'
 import { deleteResponsesForForm } from '../utils/responseStore'
 import { hasBackend } from '../utils/backendConfig'
 import { FormValidationError } from '../data/formValidation'
@@ -75,37 +85,76 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   const [error, setError] = useState('')
   const [publishingId, setPublishingId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [migratable, setMigratable] = useState([])
+  const [migrating, setMigrating] = useState(null)
   const fileInputRef = useRef(null)
   const markdownInputRef = useRef(null)
 
   async function refresh() {
-    setForms(await listForms())
+    try {
+      setForms(await listForms())
+      setError('')
+    } catch (err) {
+      setError(`Couldn't load your forms: ${err.message}`)
+    }
+  }
+
+  async function refreshMigratable() {
+    if (!hasBackend()) return
+    setMigratable(await listMigratableForms())
   }
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false))
+    Promise.all([refresh(), refreshMigratable()]).finally(() => setLoading(false))
   }, [])
 
   async function handleCreate() {
-    const form = createEmptyForm('Untitled Form')
-    await saveForm(form)
-    onOpenBuilder(form.id)
+    try {
+      const form = createEmptyForm('Untitled Form')
+      await saveForm(form)
+      onOpenBuilder(form.id)
+    } catch (err) {
+      setError(`Couldn't create a new form: ${err.message}`)
+    }
   }
 
   async function handleDuplicate(id) {
-    await duplicateForm(id)
-    refresh()
+    try {
+      await duplicateForm(id)
+      refresh()
+    } catch (err) {
+      setError(`Couldn't duplicate that form: ${err.message}`)
+    }
   }
 
   async function handleDeleteConfirmed() {
-    // Responses first. These are two transactions, so if the tab closes
-    // between them, this ordering leaves a form with no responses (visible,
-    // deletable again) rather than orphaned personal data with no form left
-    // to reach it — the dialog promises the responses are gone.
-    await deleteResponsesForForm(pendingDelete.id)
-    await deleteForm(pendingDelete.id)
+    const form = pendingDelete
     setPendingDelete(null)
-    refresh()
+    try {
+      // Responses first. These are two transactions, so if the tab closes
+      // between them, this ordering leaves a form with no responses
+      // (visible, deletable again) rather than orphaned personal data with
+      // no form left to reach it — the dialog promises the responses are
+      // gone.
+      await deleteResponsesForForm(form.id)
+      await deleteForm(form.id)
+      refresh()
+    } catch (err) {
+      setError(`Couldn't delete "${form.title}": ${err.message}`)
+    }
+  }
+
+  async function handleMigrate() {
+    setError('')
+    setMigrating({ done: 0, total: migratable.length })
+    const results = await migrateFormsToBackend(migratable, (done, total) => setMigrating({ done, total }))
+    setMigrating(null)
+    const failed = results.filter((r) => !r.ok)
+    if (failed.length) {
+      setError(`Migrated ${results.length - failed.length} of ${results.length} forms — failed: ${failed.map((f) => `${f.title} (${f.error})`).join(', ')}`)
+    }
+    await refresh()
+    await refreshMigratable()
   }
 
   async function handleExport(form) {
@@ -340,6 +389,17 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         className="hidden"
         onChange={handleMarkdownInputChange}
       />
+
+      {hasBackend() && migratable.length > 0 && (
+        <Card className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-slate-700 dark:text-slate-200">
+            {migratable.length} form{migratable.length === 1 ? '' : 's'} saved on this device haven’t been added to the database yet.
+          </span>
+          <Button onClick={handleMigrate} disabled={Boolean(migrating)}>
+            {migrating ? `Migrating ${migrating.done}/${migrating.total}…` : 'Migrate to database'}
+          </Button>
+        </Card>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">

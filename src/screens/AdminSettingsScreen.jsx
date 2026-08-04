@@ -12,20 +12,32 @@ import { getAppBrand, saveAppBrand } from '../utils/appSettings'
 export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands }) {
   const [brand, setBrand] = useState(null)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    getAppBrand().then((stored) => setBrand(stored ?? {}))
+    getAppBrand()
+      .then((stored) => setBrand(stored ?? {}))
+      .catch((err) => setError(`Couldn't load settings: ${err.message}`))
   }, [])
 
   async function handleSave() {
     setSaveState('saving')
-    const saved = await saveAppBrand(brand)
-    onSaved?.(saved)
-    setSaveState('saved')
-    setTimeout(() => setSaveState('idle'), 1500)
+    setError('')
+    try {
+      const saved = await saveAppBrand(brand)
+      onSaved?.(saved)
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 1500)
+    } catch (err) {
+      setError(`Couldn't save settings: ${err.message}`)
+      setSaveState('idle')
+    }
   }
 
   if (!brand) {
+    if (error) {
+      return <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{error}</div>
+    }
     return <div className="flex items-center justify-center py-24 text-sm text-slate-500 dark:text-slate-400">Loading settings…</div>
   }
 
@@ -49,6 +61,12 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
           The admin app's own default look — shown on the Dashboard and any form that hasn't customized its own branding.
         </p>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
       <BrandEditor
         brand={brand}

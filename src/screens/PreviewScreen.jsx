@@ -9,6 +9,7 @@ import { listResponses, exportResponsesToFile, deleteResponsesForForm } from '..
 
 export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandLoaded }) {
   const [form, setForm] = useState(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [responseCount, setResponseCount] = useState(0)
   const [exportState, setExportState] = useState('idle')
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -20,14 +21,24 @@ export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandL
 
   useEffect(() => {
     let cancelled = false
-    getForm(formId).then((loaded) => {
-      if (cancelled) return
-      setForm(loaded)
-      onBrandLoaded?.(loaded?.brand ?? null)
-      listResponses(formId).then((responses) => {
-        if (!cancelled) setResponseCount(responses.length)
+    setLoadFailed(false)
+    setForm(null)
+    getForm(formId)
+      .then((loaded) => {
+        if (cancelled) return
+        if (!loaded) {
+          setLoadFailed(true)
+          return
+        }
+        setForm(loaded)
+        onBrandLoaded?.(loaded.brand ?? null)
+        listResponses(formId).then((responses) => {
+          if (!cancelled) setResponseCount(responses.length)
+        })
       })
-    })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true)
+      })
     return () => {
       cancelled = true
     }
@@ -49,6 +60,10 @@ export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandL
     await deleteResponsesForForm(form.id)
     setConfirmingClear(false)
     refreshResponseCount(form.id)
+  }
+
+  if (loadFailed) {
+    return <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">Couldn’t load this form.</Card>
   }
 
   if (!form) {

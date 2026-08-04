@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from '../components/common/Button'
+import Card from '../components/common/Card'
 import SectionEditor from '../components/builder/SectionEditor'
 import BrandEditor from '../components/builder/BrandEditor'
 import { getForm, saveForm } from '../utils/formStore'
@@ -12,15 +13,27 @@ const inputClass =
 
 export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false }) {
   const [form, setForm] = useState(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
   const [deployState, setDeployState] = useState('idle') // idle | deploying | deployed
   const brandSectionRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
-    getForm(formId).then((loaded) => {
-      if (!cancelled) setForm(loaded)
-    })
+    setLoadFailed(false)
+    setForm(null)
+    getForm(formId)
+      .then((loaded) => {
+        if (cancelled) return
+        if (!loaded) {
+          setLoadFailed(true)
+          return
+        }
+        setForm(loaded)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true)
+      })
     return () => {
       cancelled = true
     }
@@ -86,6 +99,10 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
     const result = await saveJsxToFile(code, suggestedComponentFilename(form))
     setDeployState(result === 'saved' ? 'deployed' : 'idle')
     if (result === 'saved') setTimeout(() => setDeployState('idle'), 1500)
+  }
+
+  if (loadFailed) {
+    return <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">Couldn’t load this form.</Card>
   }
 
   if (!form) {
