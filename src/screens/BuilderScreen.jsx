@@ -3,7 +3,8 @@ import Button from '../components/common/Button'
 import Card from '../components/common/Card'
 import SectionEditor from '../components/builder/SectionEditor'
 import BrandEditor from '../components/builder/BrandEditor'
-import { getForm, saveForm } from '../utils/formStore'
+import { getForm, saveForm, publishForm } from '../utils/formStore'
+import { hasBackend } from '../utils/backendConfig'
 import { createSection } from '../data/formSchema'
 import { generateFormComponent, suggestedComponentFilename } from '../utils/generateFormComponent'
 import { saveJsxToFile } from '../utils/fileStorage'
@@ -16,6 +17,8 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
   const [loadFailed, setLoadFailed] = useState(false)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
   const [deployState, setDeployState] = useState('idle') // idle | deploying | deployed
+  const [publishState, setPublishState] = useState('idle') // idle | publishing | published
+  const [error, setError] = useState('')
   const brandSectionRef = useRef(null)
 
   useEffect(() => {
@@ -82,10 +85,39 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
 
   async function handleSave() {
     setSaveState('saving')
-    const saved = await saveForm(form)
-    setForm(saved)
-    setSaveState('saved')
-    setTimeout(() => setSaveState('idle'), 1500)
+    setError('')
+    try {
+      const saved = await saveForm(form)
+      setForm(saved)
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 1500)
+    } catch (err) {
+      setError(`Couldn't save: ${err.message}`)
+      setSaveState('idle')
+    }
+  }
+
+  // Saves the form as it currently stands in the editor, then pushes that
+  // same saved copy live — one action, so "Update" always means what it
+  // says (whatever's on screen, not whatever was last explicitly Saved).
+  // Still a full-document upsert, not a partial patch — see publishForm/
+  // saveForm in formStore.js; documents this size make that distinction
+  // immaterial, and a real diff-based patch would be real added complexity
+  // for no practical benefit here.
+  async function handlePublish() {
+    setPublishState('publishing')
+    setError('')
+    try {
+      const saved = await saveForm(form)
+      setForm(saved)
+      await publishForm(saved)
+      setForm({ ...saved, publishedAt: saved.updatedAt })
+      setPublishState('published')
+      setTimeout(() => setPublishState('idle'), 1500)
+    } catch (err) {
+      setError(`Couldn't publish: ${err.message}`)
+      setPublishState('idle')
+    }
   }
 
   // Generates a standalone component from the form as it currently stands
@@ -129,8 +161,19 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           <Button onClick={handleSave} disabled={saveState === 'saving'}>
             {saveState === 'saving' ? 'Saving…' : 'Save'}
           </Button>
+          {hasBackend() && (
+            <Button onClick={handlePublish} disabled={publishState === 'publishing'}>
+              {publishState === 'publishing' ? 'Working…' : form.publishedAt ? 'Update' : 'Publish'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
       <div className="mb-6 space-y-2">
         <input
