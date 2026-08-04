@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo } from 'react'
+import { createContext, useContext, useLayoutEffect, useMemo } from 'react'
 
 // Neutral placeholder brand — no logo image, an indigo accent, no custom
 // background image. Every field here can be overridden by a consuming
@@ -77,7 +77,13 @@ export function BrandProvider({ brand, children }) {
   // real for both paths. On cleanup, restore whatever was ambient before
   // (the parent BrandProvider's colors, or nothing for the outermost one),
   // so a per-form override doesn't leak once its screen is left.
-  useEffect(() => {
+  //
+  // useLayoutEffect, not useEffect: it runs synchronously before the browser
+  // paints, so the brand's colors are already on :root for the very first
+  // frame instead of one frame after — otherwise that first frame paints
+  // with styles.css's fallback indigo (the generic look) and then snaps to
+  // the real brand color once the effect fires.
+  useLayoutEffect(() => {
     const root = document.documentElement
     for (const [shade, value] of Object.entries(merged.colors)) {
       root.style.setProperty(`--fb-brand-${shade}`, value)
