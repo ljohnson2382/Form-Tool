@@ -14,6 +14,7 @@ function fieldsFromBrand(brand) {
     appName: brand?.appName ?? '',
     logoLight: brand?.logoLight ?? '',
     logoDark: brand?.logoDark ?? '',
+    favicon: brand?.favicon ?? '',
     backgroundLight: brand?.backgroundLight ?? '',
     backgroundDark: brand?.backgroundDark ?? '',
     backgroundColorLight: brand?.backgroundColorLight ?? '',
@@ -84,6 +85,7 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
             appName: '',
             logoLight: '',
             logoDark: '',
+            favicon: '',
             backgroundLight: '',
             backgroundDark: '',
             backgroundColorLight: '',
@@ -171,6 +173,16 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
               value={fields.logoDark}
               onChange={(e) => updateField('logoDark', e.target.value)}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Favicon</label>
+            <input
+              className={inputClass}
+              placeholder="/brands/acme/favicon.svg"
+              value={fields.favicon}
+              onChange={(e) => updateField('favicon', e.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Shown as the browser tab icon while this form is open.</p>
           </div>
           <div>
             <label className={labelClass}>Background (light mode)</label>

@@ -62,10 +62,6 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Boolean(form)])
 
-  function scrollToBrand() {
-    brandSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   function updateSection(index, updatedSection) {
     const sections = [...form.sections]
     sections[index] = updatedSection
@@ -208,9 +204,6 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
         </Button>
         <div className="flex items-center gap-2">
           {saveState === 'saved' && <span className="text-sm text-slate-500 dark:text-slate-400">Saved</span>}
-          <Button variant="secondary" onClick={scrollToBrand}>
-            ⚙ Settings
-          </Button>
           <Button variant="secondary" onClick={() => onPreview(form.id)}>
             Preview
           </Button>

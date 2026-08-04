@@ -7,6 +7,7 @@ export const defaultBrand = {
   appName: 'Form Builder',
   logoLight: null,
   logoDark: null,
+  favicon: null,
   backgroundLight: null,
   backgroundDark: null,
   backgroundColorLight: null,
@@ -94,6 +95,39 @@ export function BrandProvider({ brand, children }) {
       }
     }
   }, [merged, inherited])
+
+  // Swaps the actual browser-tab favicon (index.html only ever declares a
+  // static placeholder per app — see demo/index.html, steadytech-forms/
+  // index.html) to whatever this brand sets. Only acts when a favicon is
+  // actually set anywhere in the chain — `merged.favicon` already carries
+  // the inherited value if this level doesn't override it (pickSetFields),
+  // so the common case (no favicon configured at any level) never touches
+  // the DOM and the static placeholder stands untouched. On cleanup, restore
+  // whatever href was there before this override — same nesting behavior as
+  // the colors effect above, so leaving a form with its own favicon back to
+  // the Dashboard correctly reverts to the app-level (or static) one.
+  useLayoutEffect(() => {
+    if (!merged.favicon) return
+    let link = document.querySelector('link[rel="icon"]')
+    const created = !link
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'icon'
+      document.head.appendChild(link)
+    }
+    const previousHref = link.getAttribute('href')
+    const previousType = link.getAttribute('type')
+    link.setAttribute('href', merged.favicon)
+    link.setAttribute('type', 'image/svg+xml')
+    return () => {
+      if (created) {
+        link.remove()
+      } else {
+        if (previousHref !== null) link.setAttribute('href', previousHref)
+        if (previousType !== null) link.setAttribute('type', previousType)
+      }
+    }
+  }, [merged.favicon])
 
   return <BrandContext.Provider value={merged}>{children}</BrandContext.Provider>
 }
