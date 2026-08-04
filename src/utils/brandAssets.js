@@ -17,6 +17,7 @@ function folderSlug(path) {
 function classify(filename) {
   const lower = filename.toLowerCase()
   const isDark = lower.includes('dark')
+  if (lower.includes('favicon')) return 'favicon'
   if (lower.includes('logo')) return isDark ? 'logoDark' : 'logoLight'
   if (lower.includes('background') || lower.includes('-bg') || lower.includes('_bg')) {
     return isDark ? 'backgroundDark' : 'backgroundLight'
@@ -61,6 +62,7 @@ export function parseDetectedBrands(globModules) {
         ...(config ?? {}),
         logoLight: images.logoLight,
         logoDark: images.logoDark,
+        favicon: images.favicon,
         backgroundLight: images.backgroundLight,
         backgroundDark: images.backgroundDark,
       })

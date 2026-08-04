@@ -99,6 +99,7 @@ export function normalizeBrand(brand) {
     appName: toNullableText(brand.appName),
     logoLight: toNullableText(brand.logoLight),
     logoDark: toNullableText(brand.logoDark),
+    favicon: toNullableText(brand.favicon),
     backgroundLight: toNullableText(brand.backgroundLight),
     backgroundDark: toNullableText(brand.backgroundDark),
     // A solid fill, independent of the image fields above — see
