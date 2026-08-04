@@ -3,22 +3,27 @@ import Button from '../components/common/Button'
 import Card from '../components/common/Card'
 import SectionEditor from '../components/builder/SectionEditor'
 import BrandEditor from '../components/builder/BrandEditor'
+import PublishedLinkModal from '../components/common/PublishedLinkModal'
+import SplitIntoStagesModal from '../components/builder/SplitIntoStagesModal'
 import { getForm, saveForm, publishForm } from '../utils/formStore'
 import { hasBackend } from '../utils/backendConfig'
-import { createSection } from '../data/formSchema'
+import { fillUrlFor } from '../utils/fillLink'
+import { createSection, createId } from '../data/formSchema'
 import { generateFormComponent, suggestedComponentFilename } from '../utils/generateFormComponent'
 import { saveJsxToFile } from '../utils/fileStorage'
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
 
-export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false }) {
+export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false, fillBaseUrl }) {
   const [form, setForm] = useState(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
   const [deployState, setDeployState] = useState('idle') // idle | deploying | deployed
   const [publishState, setPublishState] = useState('idle') // idle | publishing | published
   const [error, setError] = useState('')
+  const [publishedLink, setPublishedLink] = useState(null)
+  const [splitting, setSplitting] = useState(false)
   const brandSectionRef = useRef(null)
 
   useEffect(() => {
@@ -112,11 +117,65 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
       setForm(saved)
       await publishForm(saved)
       setForm({ ...saved, publishedAt: saved.updatedAt })
+      setPublishedLink(fillUrlFor(saved, fillBaseUrl))
       setPublishState('published')
       setTimeout(() => setPublishState('idle'), 1500)
     } catch (err) {
       setError(`Couldn't publish: ${err.message}`)
       setPublishState('idle')
+    }
+  }
+
+  // Turns each of the form's current sections into its own standalone form
+  // — audienceBySection[i] is whatever was typed for that stage in
+  // SplitIntoStagesModal. Stages sharing an audience chain together via
+  // nextFormId, in their original order; a blank/unique audience makes a
+  // stage its own chain of one. The source form itself is never touched —
+  // splitting only ever adds new forms, matching this app's convention of
+  // no silent destructive side effects.
+  async function handleSplitConfirm(audienceBySection) {
+    setSplitting(false)
+    setError('')
+    try {
+      const ids = form.sections.map(() => createId('form'))
+      const now = new Date().toISOString()
+      const seriesId = createId('series')
+
+      const indicesByAudience = new Map()
+      audienceBySection.forEach((audience, i) => {
+        const key = audience?.trim() || null
+        if (!indicesByAudience.has(key)) indicesByAudience.set(key, [])
+        indicesByAudience.get(key).push(i)
+      })
+
+      const newForms = form.sections.map((section, i) => {
+        const audience = audienceBySection[i]?.trim() || null
+        const group = indicesByAudience.get(audience)
+        const posInGroup = group.indexOf(i)
+        const nextIndex = group[posInGroup + 1]
+        return {
+          id: ids[i],
+          title: section.title || `${form.title} — Stage ${i + 1}`,
+          description: section.description || '',
+          projectId: form.projectId,
+          audience,
+          seriesId,
+          seriesIndex: posInGroup + 1,
+          seriesTotal: group.length,
+          nextFormId: nextIndex !== undefined ? ids[nextIndex] : null,
+          createdAt: now,
+          updatedAt: now,
+          sections: [section],
+          brand: form.brand,
+        }
+      })
+
+      for (const newForm of newForms) {
+        await saveForm(newForm)
+      }
+      onBack()
+    } catch (err) {
+      setError(`Couldn't split into stages: ${err.message}`)
     }
   }
 
@@ -158,6 +217,11 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           <Button variant="secondary" onClick={handleDeploy} disabled={deployState === 'deploying'}>
             {deployState === 'deploying' ? 'Deploying…' : deployState === 'deployed' ? 'Deployed' : 'Deploy'}
           </Button>
+          {form.sections.length > 1 && (
+            <Button variant="secondary" onClick={() => setSplitting(true)}>
+              Split into Stages
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={saveState === 'saving'}>
             {saveState === 'saving' ? 'Saving…' : 'Save'}
           </Button>
@@ -189,12 +253,20 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           value={form.description ?? ''}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
-        <input
-          className={`${inputClass} text-sm`}
-          placeholder="Project (optional, e.g. itzipper)"
-          value={form.projectId ?? ''}
-          onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-        />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            className={`${inputClass} text-sm`}
+            placeholder="Project (optional, e.g. itzipper)"
+            value={form.projectId ?? ''}
+            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+          />
+          <input
+            className={`${inputClass} text-sm`}
+            placeholder="Audience (optional, e.g. Participant)"
+            value={form.audience ?? ''}
+            onChange={(e) => setForm({ ...form, audience: e.target.value })}
+          />
+        </div>
       </div>
 
       <div ref={brandSectionRef} className="mb-4 scroll-mt-24">
@@ -221,6 +293,16 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           + Add Section
         </Button>
       </div>
+
+      <PublishedLinkModal url={publishedLink} onClose={() => setPublishedLink(null)} />
+
+      <SplitIntoStagesModal
+        open={splitting}
+        sections={form.sections}
+        defaultAudience={form.audience}
+        onCancel={() => setSplitting(false)}
+        onConfirm={handleSplitConfirm}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function Modal({ open, onClose, title, children }) {
+export default function Modal({ open, onClose, title, children, maxWidthClassName = 'max-w-md' }) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function Modal({ open, onClose, title, children }) {
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700/50 dark:bg-slate-900"
+        className={`relative w-full ${maxWidthClassName} rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700/50 dark:bg-slate-900`}
       >
         {title && <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>}
         {children}

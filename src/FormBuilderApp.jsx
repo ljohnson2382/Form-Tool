@@ -246,6 +246,7 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
               onBrandLoaded={setActiveBrand}
               detectedBrands={detectedBrands}
               focusBrand={builderFocusBrand}
+              fillBaseUrl={fillBaseUrl}
             />
           ) : view === VIEWS.PREVIEW ? (
             <PreviewScreen formId={activeFormId} onBack={goToDashboard} onFill={openFill} onEdit={openBuilder} onBrandLoaded={setActiveBrand} />

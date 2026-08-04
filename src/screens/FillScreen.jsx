@@ -5,6 +5,7 @@ import QuestionField from '../components/fill/QuestionField'
 import { getForm } from '../utils/formStore'
 import { validateResponses, sectionsOf, itemsOf } from '../data/formSchema'
 import { submitResponse } from '../utils/responseStore'
+import { fillUrlFor } from '../utils/fillLink'
 
 // `form` — pass a form object directly to skip the IndexedDB lookup
 // entirely. This is what makes a form portable outside the admin app: see
@@ -59,6 +60,16 @@ export default function FillScreen({ formId, form: providedForm, onBack, onBrand
     }
     await submitResponse(form.id, answers)
     setSubmitted(true)
+    // Guided multi-stage flow (see BuilderScreen.jsx's "Split into Stages"):
+    // a brief pause so the respondent actually sees their submission was
+    // recorded, then a full navigation to the next stage in this audience's
+    // chain — same origin/path the current page was reached by, so it stays
+    // on whatever custom domain (e.g. uat.itzipper.com) they're already on.
+    if (form.nextFormId) {
+      setTimeout(() => {
+        window.location.href = fillUrlFor({ id: form.nextFormId })
+      }, 1500)
+    }
   }
 
   function handleFillAnother() {
@@ -84,13 +95,17 @@ export default function FillScreen({ formId, form: providedForm, onBack, onBrand
       <div>
         <Card className="py-12 text-center">
           <p className="mb-4 text-lg font-semibold">Thanks — your response has been recorded.</p>
-          <div className="flex justify-center gap-2">
-            <Button variant="secondary" onClick={handleFillAnother}>
-              Submit Another Response
-            </Button>
-            {/* Respondent mode has no dashboard to return to. */}
-            {onBack && <Button onClick={onBack}>Back to Dashboard</Button>}
-          </div>
+          {form.nextFormId ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Moving to the next stage…</p>
+          ) : (
+            <div className="flex justify-center gap-2">
+              <Button variant="secondary" onClick={handleFillAnother}>
+                Submit Another Response
+              </Button>
+              {/* Respondent mode has no dashboard to return to. */}
+              {onBack && <Button onClick={onBack}>Back to Dashboard</Button>}
+            </div>
+          )}
         </Card>
       </div>
     )
@@ -107,6 +122,11 @@ export default function FillScreen({ formId, form: providedForm, onBack, onBrand
       )}
 
       <div className="mb-6">
+        {form.seriesIndex && form.seriesTotal && (
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Stage {form.seriesIndex} of {form.seriesTotal}
+          </p>
+        )}
         <h1 className="text-2xl font-bold">{form.title}</h1>
         {form.description && <p className="mt-1 text-slate-600 dark:text-slate-300">{form.description}</p>}
       </div>
