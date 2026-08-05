@@ -4,9 +4,10 @@ import { BrandProvider, mergeBrandLayers, useBrand } from './context/BrandContex
 import PageBackground from './components/PageBackground'
 import ThemeToggle from './components/ThemeToggle'
 import ErrorBoundary from './components/common/ErrorBoundary'
+import Card from './components/common/Card'
 import { configureStorage } from './utils/db'
 import { configureBackend } from './utils/backendConfig'
-import { seedIfEmpty } from './utils/formStore'
+import { seedIfEmpty, getForm } from './utils/formStore'
 import { getAppBrand } from './utils/appSettings'
 import DashboardScreen from './screens/DashboardScreen'
 import BuilderScreen from './screens/BuilderScreen'
@@ -138,27 +139,55 @@ function Loading() {
 function RespondentShell({ seedForms, formId }) {
   const seeded = useSeeded(seedForms)
   // The form being filled may carry its own brand (logo/background/accent) —
-  // see BrandEditor.jsx. FillScreen reports it once loaded; nesting a second
-  // BrandProvider here overrides the app-level default for this one mount,
-  // exactly like Microsoft Forms themes an individual form.
-  const [activeBrand, setActiveBrand] = useState(null)
+  // see BrandEditor.jsx. Fetched here, before Chrome mounts at all, rather
+  // than inside FillScreen: a respondent only ever sees this form once, so
+  // there's no acceptable amount of the wrong (app-level default) brand to
+  // show first while the real one is still loading — same principle as the
+  // brandReady gate below, applied one level down to a specific form's brand
+  // instead of the app's own.
+  const [form, setForm] = useState(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   // Resetting during render (React's documented pattern for "state derived
   // from a prop") rather than in a useEffect, which would apply one render
   // late and flash the previous form's brand behind the loading state.
   const [lastFormId, setLastFormId] = useState(formId)
   if (formId !== lastFormId) {
     setLastFormId(formId)
-    setActiveBrand(null)
+    setForm(null)
+    setLoadFailed(false)
   }
 
-  // Always mounted (never conditionally), even with no override — React
-  // treats a BrandProvider that appears only sometimes as a different
-  // element at this tree position, remounting everything below it (losing
-  // FillScreen's state) the moment a brand toggles between set/unset.
+  useEffect(() => {
+    if (!seeded) return
+    let cancelled = false
+    getForm(formId)
+      .then((loaded) => {
+        if (cancelled) return
+        if (loaded) setForm(loaded)
+        else setLoadFailed(true)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [seeded, formId])
+
+  if (!seeded || (!form && !loadFailed)) return null
+
   return (
-    <BrandProvider brand={activeBrand}>
+    <BrandProvider brand={form?.brand ?? null}>
       <Chrome>
-        <ErrorBoundary resetKey={formId}>{seeded ? <FillScreen formId={formId} onBrandLoaded={setActiveBrand} /> : <Loading />}</ErrorBoundary>
+        <ErrorBoundary resetKey={formId}>
+          {loadFailed ? (
+            <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+              This form isn’t available. Check the link you were given.
+            </Card>
+          ) : (
+            <FillScreen form={form} />
+          )}
+        </ErrorBoundary>
       </Chrome>
     </BrandProvider>
   )
