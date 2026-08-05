@@ -321,16 +321,27 @@ export default function FormBuilderApp({
   useMemo(() => configureBackend({ apiBaseUrl, adminToken }), [apiBaseUrl, adminToken])
 
   const [effectiveBrand, setEffectiveBrand] = useState(null)
+  // Nothing renders until this flips true (see the blank-screen return
+  // below) — so there's no window where the factory-default `brand` prop
+  // is visible on its own before a stored override (if any) has actually
+  // been checked. `.finally` covers both outcomes (an override was found,
+  // or there truly isn't one) — either way, once this is true, `brand` +
+  // `effectiveBrand` together are the real, final answer, not a guess.
+  const [brandReady, setBrandReady] = useState(false)
   useEffect(() => {
-    getAppBrand().then((stored) => {
-      if (stored) setEffectiveBrand(stored)
-    })
+    getAppBrand()
+      .then((stored) => {
+        if (stored) setEffectiveBrand(stored)
+      })
+      .finally(() => setBrandReady(true))
     // Checked once per mount — AdminSettingsScreen updates effectiveBrand
     // directly on save from then on, no need to re-poll storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const respondentMode = mode === MODES.FILL
+
+  if (!brandReady) return null
 
   return (
     <ThemeProvider>
