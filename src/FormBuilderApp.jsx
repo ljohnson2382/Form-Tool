@@ -45,10 +45,14 @@ function BrandMark({ onClick }) {
         // size for no reason tied to image quality. max-w + object-contain
         // gives every aspect ratio (wide, square, stacked) the same real
         // estate to work with, capping only pathologically wide logos
-        // instead of shortchanging tall ones.
-        <img src={logo} alt={brand.appName} className="h-14 w-auto max-w-[200px] object-contain" />
+        // instead of shortchanging tall ones. h-16 (not h-14): at a wide
+        // lockup's own width cap, a taller base height buys a squarer/
+        // stacked logo (e.g. an icon-over-wordmark composition, roughly
+        // 1.8:1) noticeably more actual size before it's capped too —
+        // narrower aspect ratios need the extra height most.
+        <img src={logo} alt={brand.appName} className="h-16 w-auto max-w-[200px] object-contain" />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
+        <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
           {brand.appName.trim().charAt(0).toUpperCase()}
         </span>
       )}
