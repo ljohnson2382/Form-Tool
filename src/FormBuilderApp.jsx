@@ -32,9 +32,10 @@ export const MODES = {
   FILL: 'fill',
 }
 
-function BrandMark({ onClick }) {
+function BrandMark({ onClick, fixedName }) {
   const { theme } = useTheme()
   const brand = useBrand()
+  const appName = fixedName ?? brand.appName
   const logo = theme === 'dark' ? (brand.logoDark ?? brand.logoLight) : brand.logoLight
 
   const content = (
@@ -51,13 +52,13 @@ function BrandMark({ onClick }) {
         // stacked logo (e.g. an icon-over-wordmark composition, roughly
         // 1.8:1) noticeably more actual size before it's capped too —
         // narrower aspect ratios need the extra height most.
-        <img src={logo} alt={brand.appName} className="h-16 w-auto max-w-[200px] object-contain" />
+        <img src={logo} alt={appName} className="h-16 w-auto max-w-[200px] object-contain" />
       ) : (
         <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
-          {brand.appName.trim().charAt(0).toUpperCase()}
+          {appName.trim().charAt(0).toUpperCase()}
         </span>
       )}
-      <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{brand.appName}</span>
+      <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{appName}</span>
     </>
   )
 
@@ -66,7 +67,7 @@ function BrandMark({ onClick }) {
   if (!onClick) return <div className="flex items-center gap-3">{content}</div>
 
   return (
-    <button type="button" onClick={onClick} aria-label={`Go to ${brand.appName} dashboard`} className="flex items-center gap-3">
+    <button type="button" onClick={onClick} aria-label={`Go to ${appName} dashboard`} className="flex items-center gap-3">
       {content}
     </button>
   )
@@ -95,7 +96,7 @@ function SettingsButton({ onClick }) {
   )
 }
 
-function Chrome({ onHome, onOpenSettings, children }) {
+function Chrome({ onHome, onOpenSettings, fixedAppName, children }) {
   return (
     <div className="min-h-screen text-slate-900 dark:text-slate-100">
       <PageBackground />
@@ -106,7 +107,7 @@ function Chrome({ onHome, onOpenSettings, children }) {
       >
         <div className="mx-auto max-w-5xl px-4 pb-4 pt-6">
           <div className="flex items-center justify-between">
-            <BrandMark onClick={onHome} />
+            <BrandMark onClick={onHome} fixedName={fixedAppName} />
             <div className="flex items-center gap-2">
               {onOpenSettings && <SettingsButton onClick={onOpenSettings} />}
               <ThemeToggle />
@@ -259,7 +260,7 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
   // the active screen and lose its state every time a brand toggles on/off.
   return (
     <BrandProvider brand={activeBrand}>
-      <Chrome onHome={goToDashboard} onOpenSettings={openAdminSettings}>
+      <Chrome onHome={goToDashboard} onOpenSettings={openAdminSettings} fixedAppName="Form Builder">
         {/* Scoped per view+form so a screen that fails to render doesn't strand
             the user — navigating away clears the error and the dashboard (which
             can delete the offending form) stays reachable. */}

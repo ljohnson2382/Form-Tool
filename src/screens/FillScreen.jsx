@@ -104,7 +104,7 @@ export default function FillScreen({ formId, form: providedForm, onBack, onPickF
                 Submit Another Response
               </Button>
               {/* Respondent mode has no dashboard to return to. */}
-              {onBack && <Button onClick={onBack}>Back to Dashboard</Button>}
+              {onBack && <Button onClick={onBack}>Back to Form Dashboard</Button>}
             </div>
           )}
         </Card>
@@ -118,7 +118,7 @@ export default function FillScreen({ formId, form: providedForm, onBack, onPickF
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <Button variant="ghost" onClick={onBack}>
-              ← Back to Dashboard
+              ← Back to Form Dashboard
             </Button>
             {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
           </div>

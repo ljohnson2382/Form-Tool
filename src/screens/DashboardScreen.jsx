@@ -31,6 +31,9 @@ import { parseMarkdownToForm } from '../utils/markdownImport'
 import { fillUrlFor } from '../utils/fillLink'
 import PublishedLinkModal from '../components/common/PublishedLinkModal'
 
+const filterInputClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
+
 function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -53,6 +56,15 @@ const STATUS_LABEL = {
   draft: 'Draft',
   published: 'Published',
   stale: 'Unpublished changes',
+}
+
+const SORT_OPTIONS = {
+  UPDATED_DESC: 'updated_desc',
+  UPDATED_ASC: 'updated_asc',
+  TITLE_ASC: 'title_asc',
+  TITLE_DESC: 'title_desc',
+  QUESTIONS_DESC: 'questions_desc',
+  QUESTIONS_ASC: 'questions_asc',
 }
 
 // Groups by an arbitrary key, "Unassigned" bucket last rather than
@@ -95,8 +107,38 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   const [migratable, setMigratable] = useState([])
   const [migrating, setMigrating] = useState(null)
   const [publishedLink, setPublishedLink] = useState(null)
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState(SORT_OPTIONS.UPDATED_DESC)
   const fileInputRef = useRef(null)
   const markdownInputRef = useRef(null)
+
+  function matchesSearch(form, text) {
+    if (!text) return true
+    const needle = text.trim().toLowerCase()
+    if (!needle) return true
+    const haystack = [form.title, form.description, form.projectId, form.audience].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(needle)
+  }
+
+  function matchesStatusFilter(form, filterValue) {
+    const status = publishStatus(form)
+    if (filterValue === 'all') return true
+    if (filterValue === 'custom_branding') return Boolean(form.brand)
+    if (filterValue === 'default_branding') return !form.brand
+    return status === filterValue
+  }
+
+  function compareForms(a, b) {
+    if (sortBy === SORT_OPTIONS.UPDATED_ASC) return new Date(a.updatedAt) - new Date(b.updatedAt)
+    if (sortBy === SORT_OPTIONS.TITLE_ASC) return (a.title || '').localeCompare(b.title || '')
+    if (sortBy === SORT_OPTIONS.TITLE_DESC) return (b.title || '').localeCompare(a.title || '')
+    if (sortBy === SORT_OPTIONS.QUESTIONS_DESC) return countQuestions(b) - countQuestions(a)
+    if (sortBy === SORT_OPTIONS.QUESTIONS_ASC) return countQuestions(a) - countQuestions(b)
+    return new Date(b.updatedAt) - new Date(a.updatedAt)
+  }
+
+  const visibleForms = forms.filter((form) => matchesSearch(form, searchText) && matchesStatusFilter(form, statusFilter)).sort(compareForms)
 
   async function refresh() {
     try {
@@ -376,7 +418,7 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Your Forms</h1>
+          <h1 className="text-2xl font-bold">Form Dashboard</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Create, edit, and collect responses for surveys and forms.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -387,6 +429,42 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
           <Button onClick={handleCreate}>+ Create</Button>
         </div>
       </div>
+
+      <Card className="mb-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Search</label>
+            <input
+              className={filterInputClass}
+              placeholder="Title, description, project, or audience"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter</label>
+            <select className={filterInputClass} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All forms</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="stale">Unpublished changes</option>
+              <option value="custom_branding">Custom branding</option>
+              <option value="default_branding">Default branding</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Sort</label>
+            <select className={filterInputClass} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value={SORT_OPTIONS.UPDATED_DESC}>Recently updated</option>
+              <option value={SORT_OPTIONS.UPDATED_ASC}>Least recently updated</option>
+              <option value={SORT_OPTIONS.TITLE_ASC}>Title (A-Z)</option>
+              <option value={SORT_OPTIONS.TITLE_DESC}>Title (Z-A)</option>
+              <option value={SORT_OPTIONS.QUESTIONS_DESC}>Most questions</option>
+              <option value={SORT_OPTIONS.QUESTIONS_ASC}>Fewest questions</option>
+            </select>
+          </div>
+        </div>
+      </Card>
 
       <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileInputChange} />
       <input
@@ -418,9 +496,13 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
           No forms yet. Create one, or import a form from a markdown doc or a .form.json export.
         </Card>
+      ) : visibleForms.length === 0 ? (
+        <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+          No forms match your current search/filter settings.
+        </Card>
       ) : (
         <div className="space-y-8">
-          {groupByProjectAndAudience(forms).map(([project, audienceGroups]) => (
+          {groupByProjectAndAudience(visibleForms).map(([project, audienceGroups]) => (
             <div key={project}>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{project}</h2>
               <div className="space-y-5">

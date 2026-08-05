@@ -16,7 +16,7 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
 
   useEffect(() => {
     getAppBrand()
-      .then((stored) => setBrand(stored ?? {}))
+      .then((stored) => setBrand({ ...(stored ?? {}), appName: null }))
       .catch((err) => setError(`Couldn't load settings: ${err.message}`))
   }, [])
 
@@ -24,7 +24,7 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
     setSaveState('saving')
     setError('')
     try {
-      const saved = await saveAppBrand(brand)
+      const saved = await saveAppBrand({ ...brand, appName: null })
       onSaved?.(saved)
       setSaveState('saved')
       setTimeout(() => setSaveState('idle'), 1500)
@@ -45,7 +45,7 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack}>
-          ← Back to Dashboard
+          ← Back to Form Dashboard
         </Button>
         <div className="flex items-center gap-2">
           {saveState === 'saved' && <span className="text-sm text-slate-500 dark:text-slate-400">Saved</span>}
@@ -72,7 +72,7 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
         brand={brand}
         onChange={setBrand}
         alwaysEnabled
-        appNamePlaceholder="e.g. Form Designer"
+        showAppName={false}
         detectedBrands={detectedBrands}
       />
     </div>

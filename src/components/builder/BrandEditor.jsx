@@ -113,7 +113,7 @@ function ImageField({ label, value, placeholder, fieldKey, onChange, onUpload, u
  * where there's no "inherit vs. override" choice, just direct editing of
  * the app's own default brand.
  */
-export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEnabled = false, appNamePlaceholder }) {
+export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEnabled = false, appNamePlaceholder, showAppName = true }) {
   const enabled = alwaysEnabled || Boolean(brand)
   const fields = fieldsFromBrand(brand)
   const pickerColor = brand?.colors?.[500] ?? DEFAULT_PICKER_COLOR
@@ -235,15 +235,17 @@ export default function BrandEditor({ brand, onChange, detectedBrands, alwaysEna
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">One click fills in every field below — still editable after.</p>
             </div>
           )}
-          <div className="sm:col-span-2">
-            <label className={labelClass}>App name</label>
-            <input
-              className={inputClass}
-              placeholder={appNamePlaceholder ?? "Inherit the app's default"}
-              value={fields.appName}
-              onChange={(e) => updateField('appName', e.target.value)}
-            />
-          </div>
+          {showAppName && (
+            <div className="sm:col-span-2">
+              <label className={labelClass}>App name</label>
+              <input
+                className={inputClass}
+                placeholder={appNamePlaceholder ?? "Inherit the app's default"}
+                value={fields.appName}
+                onChange={(e) => updateField('appName', e.target.value)}
+              />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Add an image to this project's <code>src/assets/brands/&lt;name&gt;/</code> folder to have it show up above

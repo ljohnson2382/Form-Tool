@@ -207,7 +207,7 @@ export default function BuilderScreen({ formId, onBack, onPreview, onPickForm, o
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Button variant="ghost" onClick={onBack}>
-            ← Back to Dashboard
+            ← Back to Form Dashboard
           </Button>
           {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
         </div>
