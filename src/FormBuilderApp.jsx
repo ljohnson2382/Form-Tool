@@ -320,7 +320,7 @@ export default function FormBuilderApp({
   useMemo(() => configureStorage({ namespace: storageNamespace }), [storageNamespace])
   useMemo(() => configureBackend({ apiBaseUrl, adminToken }), [apiBaseUrl, adminToken])
 
-  const [effectiveBrand, setEffectiveBrand] = useState(brand)
+  const [effectiveBrand, setEffectiveBrand] = useState(null)
   useEffect(() => {
     getAppBrand().then((stored) => {
       if (stored) setEffectiveBrand(stored)
@@ -334,17 +334,27 @@ export default function FormBuilderApp({
 
   return (
     <ThemeProvider>
-      <BrandProvider brand={effectiveBrand}>
-        {respondentMode ? (
-          <RespondentShell seedForms={seedForms} formId={formId} />
-        ) : (
-          <AdminShell
-            seedForms={seedForms}
-            fillBaseUrl={fillBaseUrl}
-            detectedBrands={detectedBrands}
-            onAppBrandSaved={setEffectiveBrand}
-          />
-        )}
+      {/* Nested, not flattened into one: the runtime-editable override
+          (Settings screen, or a stored fetch) is very often partial — e.g.
+          "just change the logo" — and BrandProvider's inherit-the-rest
+          merge is exactly what makes a partial override correctly fall
+          back to every field `brand` (the app's factory default, baked in
+          at <FormBuilderApp brand={...}>) already set, instead of falling
+          all the way back to the kit's own generic defaultBrand for
+          whatever the override didn't touch. */}
+      <BrandProvider brand={brand}>
+        <BrandProvider brand={effectiveBrand}>
+          {respondentMode ? (
+            <RespondentShell seedForms={seedForms} formId={formId} />
+          ) : (
+            <AdminShell
+              seedForms={seedForms}
+              fillBaseUrl={fillBaseUrl}
+              detectedBrands={detectedBrands}
+              onAppBrandSaved={setEffectiveBrand}
+            />
+          )}
+        </BrandProvider>
       </BrandProvider>
     </ThemeProvider>
   )
