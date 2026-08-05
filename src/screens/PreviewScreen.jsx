@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import Button from '../components/common/Button'
 import Card from '../components/common/Card'
 import ConfirmDialog from '../components/common/ConfirmDialog'
+import FormPicker from '../components/common/FormPicker'
 import QuestionField from '../components/fill/QuestionField'
 import { getForm } from '../utils/formStore'
 import { sectionsOf, itemsOf } from '../data/formSchema'
 import { listResponses, exportResponsesToFile, deleteResponsesForForm } from '../utils/responseStore'
 
-export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandLoaded }) {
+export default function PreviewScreen({ formId, onBack, onFill, onEdit, onPickForm, onBrandLoaded }) {
   const [form, setForm] = useState(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [responseCount, setResponseCount] = useState(0)
@@ -73,9 +74,12 @@ export default function PreviewScreen({ formId, onBack, onFill, onEdit, onBrandL
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={onBack}>
-          ← Back to Dashboard
-        </Button>
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          <Button variant="ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </Button>
+          {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => onEdit(form.id)}>
             Edit

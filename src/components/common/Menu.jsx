@@ -8,7 +8,7 @@ import Button from './Button'
  * needed). Lighter than Modal.jsx, which centers over the whole page rather
  * than anchoring to a trigger.
  */
-export default function Menu({ label, children }) {
+export default function Menu({ label, children, triggerSize = 'sm' }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
 
@@ -30,7 +30,7 @@ export default function Menu({ label, children }) {
 
   return (
     <div ref={containerRef} className="relative inline-block">
-      <Button size="sm" variant="secondary" onClick={() => setOpen((v) => !v)} aria-haspopup="true" aria-expanded={open}>
+      <Button size={triggerSize} variant="secondary" onClick={() => setOpen((v) => !v)} aria-haspopup="true" aria-expanded={open}>
         {label}
       </Button>
       {open && (

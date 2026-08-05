@@ -280,17 +280,25 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
               formId={activeFormId}
               onBack={goToDashboard}
               onPreview={openPreview}
+              onPickForm={openBuilder}
               onBrandLoaded={setActiveBrand}
               detectedBrands={detectedBrands}
               focusBrand={builderFocusBrand}
               fillBaseUrl={fillBaseUrl}
             />
           ) : view === VIEWS.PREVIEW ? (
-            <PreviewScreen formId={activeFormId} onBack={goToDashboard} onFill={openFill} onEdit={openBuilder} onBrandLoaded={setActiveBrand} />
+            <PreviewScreen
+              formId={activeFormId}
+              onBack={goToDashboard}
+              onFill={openFill}
+              onEdit={openBuilder}
+              onPickForm={openPreview}
+              onBrandLoaded={setActiveBrand}
+            />
           ) : view === VIEWS.FILL ? (
-            <FillScreen formId={activeFormId} onBack={goToDashboard} onBrandLoaded={setActiveBrand} />
+            <FillScreen formId={activeFormId} onBack={goToDashboard} onPickForm={openFill} onBrandLoaded={setActiveBrand} />
           ) : view === VIEWS.RESPONSES ? (
-            <ResponsesScreen formId={activeFormId} onBack={goToDashboard} onBrandLoaded={setActiveBrand} />
+            <ResponsesScreen formId={activeFormId} onBack={goToDashboard} onPickForm={openResponses} onBrandLoaded={setActiveBrand} />
           ) : view === VIEWS.SETTINGS ? (
             <AdminSettingsScreen onBack={goToDashboard} onSaved={onAppBrandSaved} detectedBrands={detectedBrands} />
           ) : null}

@@ -380,11 +380,11 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
           <p className="text-sm text-slate-500 dark:text-slate-400">Create, edit, and collect responses for surveys and forms.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Menu label="Import">
+          <Menu label="Import" triggerSize="md">
             <MenuItem onClick={handleImportMarkdownClick}>From Markdown</MenuItem>
             <MenuItem onClick={handleImportClick}>From .form.json</MenuItem>
           </Menu>
-          <Button onClick={handleCreate}>+ Create New Form</Button>
+          <Button onClick={handleCreate}>+ Create</Button>
         </div>
       </div>
 

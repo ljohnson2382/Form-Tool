@@ -5,6 +5,7 @@ import SectionEditor from '../components/builder/SectionEditor'
 import BrandEditor from '../components/builder/BrandEditor'
 import PublishedLinkModal from '../components/common/PublishedLinkModal'
 import SplitIntoStagesModal from '../components/builder/SplitIntoStagesModal'
+import FormPicker from '../components/common/FormPicker'
 import { getForm, saveForm, publishForm } from '../utils/formStore'
 import { hasBackend } from '../utils/backendConfig'
 import { fillUrlFor } from '../utils/fillLink'
@@ -15,7 +16,7 @@ import { saveJsxToFile } from '../utils/fileStorage'
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
 
-export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded, detectedBrands, focusBrand = false, fillBaseUrl }) {
+export default function BuilderScreen({ formId, onBack, onPreview, onPickForm, onBrandLoaded, detectedBrands, focusBrand = false, fillBaseUrl }) {
   const [form, setForm] = useState(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved
@@ -204,9 +205,12 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={onBack}>
-          ← Back to Dashboard
-        </Button>
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          <Button variant="ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </Button>
+          {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
+        </div>
         <div className="flex items-center gap-2">
           {saveState === 'saved' && <span className="text-sm text-slate-500 dark:text-slate-400">Saved</span>}
           <Button variant="secondary" onClick={() => onPreview(form.id)}>

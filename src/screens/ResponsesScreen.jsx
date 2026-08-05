@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Button from '../components/common/Button'
 import Card from '../components/common/Card'
+import FormPicker from '../components/common/FormPicker'
 import QuestionField from '../components/fill/QuestionField'
 import { getForm } from '../utils/formStore'
 import { sectionsOf, itemsOf } from '../data/formSchema'
@@ -10,7 +11,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-export default function ResponsesScreen({ formId, onBack, onBrandLoaded }) {
+export default function ResponsesScreen({ formId, onBack, onPickForm, onBrandLoaded }) {
   const [form, setForm] = useState(null)
   const [responses, setResponses] = useState(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -54,10 +55,13 @@ export default function ResponsesScreen({ formId, onBack, onBrandLoaded }) {
 
   return (
     <div>
-      <div className="mb-6">
-        <Button variant="ghost" onClick={onBack}>
-          ← Back to Dashboard
-        </Button>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          <Button variant="ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </Button>
+          {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
+        </div>
       </div>
 
       <div className="mb-6">
