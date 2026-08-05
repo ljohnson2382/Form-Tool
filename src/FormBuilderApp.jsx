@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { BrandProvider, useBrand } from './context/BrandContext'
+import { BrandProvider, mergeBrandLayers, useBrand } from './context/BrandContext'
 import PageBackground from './components/PageBackground'
 import ThemeToggle from './components/ThemeToggle'
 import ErrorBoundary from './components/common/ErrorBoundary'
@@ -45,10 +45,14 @@ function BrandMark({ onClick }) {
         // size for no reason tied to image quality. max-w + object-contain
         // gives every aspect ratio (wide, square, stacked) the same real
         // estate to work with, capping only pathologically wide logos
-        // instead of shortchanging tall ones.
-        <img src={logo} alt={brand.appName} className="h-14 w-auto max-w-[200px] object-contain" />
+        // instead of shortchanging tall ones. h-16 (not h-14): at a wide
+        // lockup's own width cap, a taller base height buys a squarer/
+        // stacked logo (e.g. an icon-over-wordmark composition, roughly
+        // 1.8:1) noticeably more actual size before it's capped too —
+        // narrower aspect ratios need the extra height most.
+        <img src={logo} alt={brand.appName} className="h-16 w-auto max-w-[200px] object-contain" />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
+        <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-brand-500 text-base font-bold text-white">
           {brand.appName.trim().charAt(0).toUpperCase()}
         </span>
       )}
@@ -341,31 +345,34 @@ export default function FormBuilderApp({
 
   const respondentMode = mode === MODES.FILL
 
+  // Merged in plain JS, not via a second nested BrandProvider: the runtime
+  // override (Settings screen, or a stored fetch) is very often partial —
+  // e.g. "just change the logo" — and this merge is what makes it correctly
+  // fall back to every field `brand` (the app's factory default, baked in
+  // at <FormBuilderApp brand={...}>) already set, instead of falling all
+  // the way back to the kit's own generic defaultBrand for whatever the
+  // override didn't touch. A second BrandProvider would do the same field
+  // merge, but its own layout effect writing --fb-brand-* would run *after*
+  // this one's (React always runs a parent's effects after its child's) and
+  // clobber it back to the factory colors on every load — one provider,
+  // pre-merged, means only one effect ever touches document.documentElement.
+  const appBrand = useMemo(() => mergeBrandLayers(brand, effectiveBrand), [brand, effectiveBrand])
+
   if (!brandReady) return null
 
   return (
     <ThemeProvider>
-      {/* Nested, not flattened into one: the runtime-editable override
-          (Settings screen, or a stored fetch) is very often partial — e.g.
-          "just change the logo" — and BrandProvider's inherit-the-rest
-          merge is exactly what makes a partial override correctly fall
-          back to every field `brand` (the app's factory default, baked in
-          at <FormBuilderApp brand={...}>) already set, instead of falling
-          all the way back to the kit's own generic defaultBrand for
-          whatever the override didn't touch. */}
-      <BrandProvider brand={brand}>
-        <BrandProvider brand={effectiveBrand}>
-          {respondentMode ? (
-            <RespondentShell seedForms={seedForms} formId={formId} />
-          ) : (
-            <AdminShell
-              seedForms={seedForms}
-              fillBaseUrl={fillBaseUrl}
-              detectedBrands={detectedBrands}
-              onAppBrandSaved={setEffectiveBrand}
-            />
-          )}
-        </BrandProvider>
+      <BrandProvider brand={appBrand}>
+        {respondentMode ? (
+          <RespondentShell seedForms={seedForms} formId={formId} />
+        ) : (
+          <AdminShell
+            seedForms={seedForms}
+            fillBaseUrl={fillBaseUrl}
+            detectedBrands={detectedBrands}
+            onAppBrandSaved={setEffectiveBrand}
+          />
+        )}
       </BrandProvider>
     </ThemeProvider>
   )

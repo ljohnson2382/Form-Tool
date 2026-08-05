@@ -44,6 +44,26 @@ function pickSetFields(brand) {
   return result
 }
 
+// Exported so a component that needs to combine two brand *sources* itself
+// (e.g. FormBuilderApp.jsx merging its factory-default `brand` prop with a
+// fetched runtime override into one value) can do it in plain JS instead of
+// nesting two BrandProviders — nesting works fine when the layers genuinely
+// mount at different times (a per-form override appearing only once that
+// screen opens), but two providers that both need to be correct on the very
+// same first paint would each try to write --fb-brand-* on document.
+// documentElement in their own layout effect, and React always runs a
+// parent's effects after its child's — so the outer (less specific) one
+// would clobber the inner (more specific) one's colors, every time. One
+// provider means one effect, so there's nothing to clobber.
+export function mergeBrandLayers(inherited, brand) {
+  if (!brand) return inherited
+  return {
+    ...inherited,
+    ...pickSetFields(brand),
+    colors: { ...inherited.colors, ...(brand.colors ?? {}) },
+  }
+}
+
 // Merges against whatever BrandProvider is already active above it (falling
 // all the way back to `defaultBrand` at the outermost one, since useContext
 // resolves to createContext's default with no ancestor provider) rather than
@@ -54,14 +74,7 @@ function pickSetFields(brand) {
 export function BrandProvider({ brand, children }) {
   const inherited = useContext(BrandContext)
 
-  const merged = useMemo(() => {
-    if (!brand) return inherited
-    return {
-      ...inherited,
-      ...pickSetFields(brand),
-      colors: { ...inherited.colors, ...(brand.colors ?? {}) },
-    }
-  }, [inherited, brand])
+  const merged = useMemo(() => mergeBrandLayers(inherited, brand), [inherited, brand])
 
   // Tailwind's `bg-brand-500` etc. compile to `background-color:
   // var(--color-brand-500)`, and `--color-brand-500: var(--fb-brand-500,
