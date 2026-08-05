@@ -199,10 +199,10 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
   const [activeFormId, setActiveFormId] = useState(null)
   // Only Builder/Preview/Fill/Responses are scoped to one form — Dashboard
   // lists many, so it always shows the app-level default (this never gets
-  // set while there). Cleared synchronously inside each navigation function
-  // below, in the same batch as the view/form change — not via a useEffect
-  // keyed on [view, activeFormId], which would apply the reset one render
-  // late and flash the previous form's theme over the destination screen.
+  // set while there). Set inside navigateToForm below, in the same batch as
+  // the view/form change — not via a useEffect keyed on [view, activeFormId],
+  // which would apply the change one render late and flash the wrong brand
+  // over the destination screen.
   const [activeBrand, setActiveBrand] = useState(null)
   // Set alongside the other navigation state so BuilderScreen knows to jump
   // straight to its branding panel — used by the Dashboard's "⋯ More →
@@ -215,11 +215,21 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
     setView(VIEWS.DASHBOARD)
   }
 
-  function openBuilder(formId, { focusBrand = false } = {}) {
+  // Fetches the target form before switching, so activeBrand and view flip
+  // together and Chrome never renders the outgoing form's brand (or the app
+  // default) behind the incoming one's loading state — same flash
+  // RespondentShell had for direct fill links, here for every
+  // Builder/Preview/Fill/Responses navigation.
+  async function navigateToForm(formId, view) {
+    const loaded = await getForm(formId).catch(() => null)
     setActiveFormId(formId)
-    setActiveBrand(null)
+    setActiveBrand(loaded?.brand ?? null)
+    setView(view)
+  }
+
+  function openBuilder(formId, { focusBrand = false } = {}) {
     setBuilderFocusBrand(focusBrand)
-    setView(VIEWS.BUILDER)
+    navigateToForm(formId, VIEWS.BUILDER)
   }
 
   function openSettings(formId) {
@@ -227,21 +237,15 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
   }
 
   function openPreview(formId) {
-    setActiveFormId(formId)
-    setActiveBrand(null)
-    setView(VIEWS.PREVIEW)
+    navigateToForm(formId, VIEWS.PREVIEW)
   }
 
   function openFill(formId) {
-    setActiveFormId(formId)
-    setActiveBrand(null)
-    setView(VIEWS.FILL)
+    navigateToForm(formId, VIEWS.FILL)
   }
 
   function openResponses(formId) {
-    setActiveFormId(formId)
-    setActiveBrand(null)
-    setView(VIEWS.RESPONSES)
+    navigateToForm(formId, VIEWS.RESPONSES)
   }
 
   function openAdminSettings() {

@@ -47,9 +47,14 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
     }
   }, [formId])
 
-  // Fires on load and on every edit, so the Branding panel previews live in
-  // the surrounding chrome (header/background) instead of only after Save.
+  // Fires once the form has actually loaded, and again on every edit, so the
+  // Branding panel previews live in the surrounding chrome (header/
+  // background) instead of only after Save. Skipped while form is still
+  // null (the pre-fetch gap before the effect below resolves) — firing with
+  // null here would stomp whatever brand the parent shell already resolved
+  // before navigating to this screen.
   useEffect(() => {
+    if (!form) return
     onBrandLoaded?.(form?.brand ?? null)
   }, [form?.brand, onBrandLoaded])
 
