@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { BrandProvider, useBrand } from './context/BrandContext'
+import { BrandProvider, mergeBrandLayers, useBrand } from './context/BrandContext'
 import PageBackground from './components/PageBackground'
 import ThemeToggle from './components/ThemeToggle'
 import ErrorBoundary from './components/common/ErrorBoundary'
@@ -341,31 +341,34 @@ export default function FormBuilderApp({
 
   const respondentMode = mode === MODES.FILL
 
+  // Merged in plain JS, not via a second nested BrandProvider: the runtime
+  // override (Settings screen, or a stored fetch) is very often partial —
+  // e.g. "just change the logo" — and this merge is what makes it correctly
+  // fall back to every field `brand` (the app's factory default, baked in
+  // at <FormBuilderApp brand={...}>) already set, instead of falling all
+  // the way back to the kit's own generic defaultBrand for whatever the
+  // override didn't touch. A second BrandProvider would do the same field
+  // merge, but its own layout effect writing --fb-brand-* would run *after*
+  // this one's (React always runs a parent's effects after its child's) and
+  // clobber it back to the factory colors on every load — one provider,
+  // pre-merged, means only one effect ever touches document.documentElement.
+  const appBrand = useMemo(() => mergeBrandLayers(brand, effectiveBrand), [brand, effectiveBrand])
+
   if (!brandReady) return null
 
   return (
     <ThemeProvider>
-      {/* Nested, not flattened into one: the runtime-editable override
-          (Settings screen, or a stored fetch) is very often partial — e.g.
-          "just change the logo" — and BrandProvider's inherit-the-rest
-          merge is exactly what makes a partial override correctly fall
-          back to every field `brand` (the app's factory default, baked in
-          at <FormBuilderApp brand={...}>) already set, instead of falling
-          all the way back to the kit's own generic defaultBrand for
-          whatever the override didn't touch. */}
-      <BrandProvider brand={brand}>
-        <BrandProvider brand={effectiveBrand}>
-          {respondentMode ? (
-            <RespondentShell seedForms={seedForms} formId={formId} />
-          ) : (
-            <AdminShell
-              seedForms={seedForms}
-              fillBaseUrl={fillBaseUrl}
-              detectedBrands={detectedBrands}
-              onAppBrandSaved={setEffectiveBrand}
-            />
-          )}
-        </BrandProvider>
+      <BrandProvider brand={appBrand}>
+        {respondentMode ? (
+          <RespondentShell seedForms={seedForms} formId={formId} />
+        ) : (
+          <AdminShell
+            seedForms={seedForms}
+            fillBaseUrl={fillBaseUrl}
+            detectedBrands={detectedBrands}
+            onAppBrandSaved={setEffectiveBrand}
+          />
+        )}
       </BrandProvider>
     </ThemeProvider>
   )
