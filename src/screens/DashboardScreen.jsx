@@ -32,6 +32,9 @@ import { parseMarkdownToForm } from '../utils/markdownImport'
 import { fillUrlFor } from '../utils/fillLink'
 import PublishedLinkModal from '../components/common/PublishedLinkModal'
 
+const filterInputClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
+
 function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -56,38 +59,23 @@ const STATUS_LABEL = {
   stale: 'Unpublished changes',
 }
 
-// Groups by an arbitrary key, "Unassigned" bucket last rather than
-// scattered alphabetically — same rule for project as for audience.
-function groupBy(forms, keyFn) {
-  const groups = new Map()
-  for (const form of forms) {
-    const key = keyFn(form) || 'Unassigned'
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(form)
-  }
-  return [...groups.entries()].sort(([a], [b]) => {
-    if (a === 'Unassigned') return 1
-    if (b === 'Unassigned') return -1
-    return a.localeCompare(b)
-  })
+const SORT_OPTIONS = {
+  UPDATED_DESC: 'updated_desc',
+  UPDATED_ASC: 'updated_asc',
+  TITLE_ASC: 'title_asc',
+  TITLE_DESC: 'title_desc',
+  QUESTIONS_DESC: 'questions_desc',
+  QUESTIONS_ASC: 'questions_asc',
 }
 
-// Forms with no projectId set (the common case until someone starts using
-// the field) land in one "Unassigned" group at the end. Within each
-// project, a second level groups by audience (who the form is actually
-// for — "Participant", "Moderator", etc., see formSchema.js) the same way —
-// this is what makes "which link goes to which audience" visible at a
-// glance instead of one flat list per project.
-//
-// `projects` resolves a form's projectId to that saved Project's name (see
-// ProjectsPanel.jsx) for the group heading — a form whose projectId doesn't
-// match any saved Project (typed by hand before Projects existed, or since
-// deleted) still groups fine, just under its raw projectId string.
-function groupByProjectAndAudience(forms, projects) {
-  const nameById = new Map(projects.map((project) => [project.id, project.name]))
-  return groupBy(forms, (form) => (form.projectId ? (nameById.get(form.projectId) ?? form.projectId) : null)).map(
-    ([project, projectForms]) => [project, groupBy(projectForms, (form) => form.audience)],
-  )
+// Resolves a form's projectId to that saved Project's name (see
+// ProjectsPanel.jsx) for the badge on each card and the Project filter below
+// — a form whose projectId doesn't match any saved Project (typed by hand
+// before Projects existed, or since deleted) still displays fine, just under
+// its raw projectId string.
+function projectNameFor(form, projectsById) {
+  if (!form.projectId) return null
+  return projectsById.get(form.projectId) ?? form.projectId
 }
 
 export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFill, onOpenResponses, onOpenSettings, fillBaseUrl }) {
@@ -102,8 +90,52 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   const [migrating, setMigrating] = useState(null)
   const [publishedLink, setPublishedLink] = useState(null)
   const [projects, setProjects] = useState([])
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [sortBy, setSortBy] = useState(SORT_OPTIONS.UPDATED_DESC)
   const fileInputRef = useRef(null)
   const markdownInputRef = useRef(null)
+
+  function matchesSearch(form, text) {
+    if (!text) return true
+    const needle = text.trim().toLowerCase()
+    if (!needle) return true
+    const haystack = [form.title, form.description, form.projectId, projectNameFor(form, projectsById), form.audience]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(needle)
+  }
+
+  function matchesStatusFilter(form, filterValue) {
+    const status = publishStatus(form)
+    if (filterValue === 'all') return true
+    if (filterValue === 'custom_branding') return Boolean(form.brand)
+    if (filterValue === 'default_branding') return !form.brand
+    return status === filterValue
+  }
+
+  function matchesProjectFilter(form, filterValue) {
+    if (filterValue === 'all') return true
+    if (filterValue === 'unassigned') return !form.projectId
+    return form.projectId === filterValue
+  }
+
+  function compareForms(a, b) {
+    if (sortBy === SORT_OPTIONS.UPDATED_ASC) return new Date(a.updatedAt) - new Date(b.updatedAt)
+    if (sortBy === SORT_OPTIONS.TITLE_ASC) return (a.title || '').localeCompare(b.title || '')
+    if (sortBy === SORT_OPTIONS.TITLE_DESC) return (b.title || '').localeCompare(a.title || '')
+    if (sortBy === SORT_OPTIONS.QUESTIONS_DESC) return countQuestions(b) - countQuestions(a)
+    if (sortBy === SORT_OPTIONS.QUESTIONS_ASC) return countQuestions(a) - countQuestions(b)
+    return new Date(b.updatedAt) - new Date(a.updatedAt)
+  }
+
+  const projectsById = new Map(projects.map((project) => [project.id, project.name]))
+
+  const visibleForms = forms
+    .filter((form) => matchesSearch(form, searchText) && matchesStatusFilter(form, statusFilter) && matchesProjectFilter(form, projectFilter))
+    .sort(compareForms)
 
   async function refresh() {
     try {
@@ -339,6 +371,11 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
                 Custom branding
               </span>
             )}
+            {form.projectId && (
+              <span className="rounded-full border border-slate-200 px-2 py-0.5 dark:border-slate-700/50">
+                {projectNameFor(form, projectsById)}
+              </span>
+            )}
             {hasBackend() && (
               <span className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${STATUS_BADGE[status]}`}>
                 {STATUS_LABEL[status]}
@@ -394,17 +431,65 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Your Forms</h1>
+          <h1 className="text-2xl font-bold">Form Dashboard</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Create, edit, and collect responses for surveys and forms.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Menu label="Import">
+          <Menu label="Import" triggerSize="md">
             <MenuItem onClick={handleImportMarkdownClick}>From Markdown</MenuItem>
             <MenuItem onClick={handleImportClick}>From .form.json</MenuItem>
           </Menu>
-          <Button onClick={handleCreate}>+ Create New Form</Button>
+          <Button onClick={handleCreate}>+ Create</Button>
         </div>
       </div>
+
+      <Card className="mb-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Search</label>
+            <input
+              className={filterInputClass}
+              placeholder="Title, description, project, or audience"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter</label>
+            <select className={filterInputClass} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All forms</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="stale">Unpublished changes</option>
+              <option value="custom_branding">Custom branding</option>
+              <option value="default_branding">Default branding</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Project</label>
+            <select className={filterInputClass} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+              <option value="all">All projects</option>
+              <option value="unassigned">Unassigned</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Sort</label>
+            <select className={filterInputClass} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value={SORT_OPTIONS.UPDATED_DESC}>Recently updated</option>
+              <option value={SORT_OPTIONS.UPDATED_ASC}>Least recently updated</option>
+              <option value={SORT_OPTIONS.TITLE_ASC}>Title (A-Z)</option>
+              <option value={SORT_OPTIONS.TITLE_DESC}>Title (Z-A)</option>
+              <option value={SORT_OPTIONS.QUESTIONS_DESC}>Most questions</option>
+              <option value={SORT_OPTIONS.QUESTIONS_ASC}>Fewest questions</option>
+            </select>
+          </div>
+        </div>
+      </Card>
 
       <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileInputChange} />
       <input
@@ -436,23 +521,13 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
           No forms yet. Create one, or import a form from a markdown doc or a .form.json export.
         </Card>
+      ) : visibleForms.length === 0 ? (
+        <Card className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+          No forms match your current search/filter settings.
+        </Card>
       ) : (
-        <div className="space-y-8">
-          {groupByProjectAndAudience(forms, projects).map(([project, audienceGroups]) => (
-            <div key={project}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{project}</h2>
-              <div className="space-y-5">
-                {audienceGroups.map(([audience, audienceForms]) => (
-                  <div key={audience}>
-                    {audienceGroups.length > 1 && (
-                      <h3 className="mb-2 text-xs font-semibold text-slate-400 dark:text-slate-500">{audience}</h3>
-                    )}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{audienceForms.map(renderFormCard)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {visibleForms.map(renderFormCard)}
         </div>
       )}
 

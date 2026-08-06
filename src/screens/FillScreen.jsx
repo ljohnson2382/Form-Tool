@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Button from '../components/common/Button'
 import Card from '../components/common/Card'
+import FormPicker from '../components/common/FormPicker'
 import QuestionField from '../components/fill/QuestionField'
 import { getForm } from '../utils/formStore'
 import { validateResponses, sectionsOf, itemsOf } from '../data/formSchema'
@@ -12,7 +13,7 @@ import { fillUrlFor } from '../utils/fillLink'
 // utils/generateFormComponent.js, which generates a standalone component
 // carrying its form's data this way, since a different React project's
 // IndexedDB has no way to already have this form seeded into it.
-export default function FillScreen({ formId, form: providedForm, onBack, onBrandLoaded }) {
+export default function FillScreen({ formId, form: providedForm, onBack, onPickForm, onBrandLoaded }) {
   const [form, setForm] = useState(providedForm ?? null)
   const [answers, setAnswers] = useState({})
   const [errors, setErrors] = useState({})
@@ -103,7 +104,7 @@ export default function FillScreen({ formId, form: providedForm, onBack, onBrand
                 Submit Another Response
               </Button>
               {/* Respondent mode has no dashboard to return to. */}
-              {onBack && <Button onClick={onBack}>Back to Dashboard</Button>}
+              {onBack && <Button onClick={onBack}>Back to Form Dashboard</Button>}
             </div>
           )}
         </Card>
@@ -115,9 +116,12 @@ export default function FillScreen({ formId, form: providedForm, onBack, onBrand
     <div>
       {onBack && (
         <div className="mb-6 flex items-center justify-between gap-3">
-          <Button variant="ghost" onClick={onBack}>
-            ← Back to Dashboard
-          </Button>
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+            <Button variant="ghost" onClick={onBack}>
+              ← Back to Form Dashboard
+            </Button>
+            {onPickForm && <FormPicker currentFormId={form.id} onPick={onPickForm} />}
+          </div>
         </div>
       )}
 

@@ -2,26 +2,29 @@ import { useEffect, useState } from 'react'
 import Card from '../common/Card'
 import { deriveColorScale } from '../../utils/colorScale'
 
-// Keeps an uploaded image's data URL well under Cosmos DB's 2MB per-document
-// limit even with several fields set on the same brand — logos/favicons are
-// tiny at this size, and a background photo just needs re-compressing first.
-const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
 
 const labelClass = 'mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400'
 
 const DEFAULT_PICKER_COLOR = '#6366f1'
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(new Error('Could not read that file.'))
+    reader.readAsDataURL(file)
+  })
+}
 
 function fieldsFromBrand(brand) {
   return {
@@ -59,45 +62,44 @@ function ColorField({ label, value, onChange, placeholder }) {
   )
 }
 
-// A path/URL text field (for the existing "point at a file already in the
-// project" workflow) paired with a real file picker — reads the chosen
-// image into a data URL and writes it to the same field, same as typing a
-// path, so a Project's images (see ProjectsPanel.jsx) can be uploaded at
-// runtime instead of requiring a code change to add a file to the repo.
-function ImageField({ label, value, onChange, placeholder, hint }) {
-  const [error, setError] = useState('')
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    if (file.size > MAX_IMAGE_BYTES) {
-      setError(`"${file.name}" is ${Math.round(file.size / 1024)}KB — keep uploads under ${Math.round(MAX_IMAGE_BYTES / 1024)}KB.`)
-      return
-    }
-    setError('')
-    onChange(await readFileAsDataUrl(file))
-  }
+function ImageField({ label, value, placeholder, fieldKey, onChange, onUpload, uploadState, uploadError, hint }) {
+  const busy = uploadState === fieldKey
 
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      <div className="flex gap-2">
-        <input className={inputClass} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-        <label className="flex shrink-0 cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-200 dark:hover:bg-slate-800/60">
-          Upload
-          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <input className={inputClass} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <label
+          className={`inline-flex cursor-pointer items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700/50 dark:text-slate-200 dark:hover:bg-slate-800/60 ${
+            busy ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
+          {busy ? 'Uploading…' : 'Upload image'}
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onUpload(fieldKey, file)
+              // Allow selecting the same file again after replacing/removing.
+              e.target.value = ''
+            }}
+            disabled={busy}
+          />
         </label>
+        <button
+          type="button"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700/50 dark:text-slate-300 dark:hover:bg-slate-800/50"
+          onClick={() => onChange('')}
+          disabled={!value || busy}
+        >
+          Clear
+        </button>
       </div>
-      {value && (
-        <img
-          src={value}
-          alt=""
-          className="mt-2 h-10 w-auto max-w-[140px] rounded border border-slate-200 object-contain dark:border-slate-700/50"
-        />
-      )}
-      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
-      {hint && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
+      {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
+      {uploadError ? <p className="mt-1 text-xs text-red-600 dark:text-red-300">{uploadError}</p> : null}
     </div>
   )
 }
@@ -119,10 +121,13 @@ export default function BrandEditor({
   onApplyProject,
   alwaysEnabled = false,
   appNamePlaceholder,
+  showAppName = true,
 }) {
   const enabled = alwaysEnabled || Boolean(brand)
   const fields = fieldsFromBrand(brand)
   const pickerColor = brand?.colors?.[500] ?? DEFAULT_PICKER_COLOR
+  const [uploadingField, setUploadingField] = useState(null)
+  const [uploadErrors, setUploadErrors] = useState({})
 
   // A free-typed draft, separate from pickerColor, so partial input (e.g.
   // "#3b8") isn't overwritten mid-keystroke by the last valid derived color
@@ -134,7 +139,41 @@ export default function BrandEditor({
   }, [pickerColor])
 
   function updateField(key, value) {
+    setUploadErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
     onChange({ ...(brand ?? {}), [key]: value })
+  }
+
+  async function uploadFieldImage(key, file) {
+    if (!file) return
+    if (!file.type?.startsWith('image/')) {
+      setUploadErrors((prev) => ({ ...prev, [key]: 'Please choose an image file.' }))
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadErrors((prev) => ({ ...prev, [key]: `Image is ${formatBytes(file.size)}. Max allowed is ${formatBytes(MAX_IMAGE_BYTES)}.` }))
+      return
+    }
+
+    setUploadingField(key)
+    setUploadErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      onChange({ ...(brand ?? {}), [key]: dataUrl })
+    } catch (err) {
+      setUploadErrors((prev) => ({ ...prev, [key]: err?.message || 'Could not upload that image.' }))
+    } finally {
+      setUploadingField(null)
+    }
   }
 
   function updateColor(hex) {
@@ -238,55 +277,86 @@ export default function BrandEditor({
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">One click fills in every field below — still editable after.</p>
             </div>
           )}
-          <div className="sm:col-span-2">
-            <label className={labelClass}>App name</label>
-            <input
-              className={inputClass}
-              placeholder={appNamePlaceholder ?? "Inherit the app's default"}
-              value={fields.appName}
-              onChange={(e) => updateField('appName', e.target.value)}
-            />
-          </div>
+          {showAppName && (
+            <div className="sm:col-span-2">
+              <label className={labelClass}>App name</label>
+              <input
+                className={inputClass}
+                placeholder={appNamePlaceholder ?? "Inherit the app's default"}
+                value={fields.appName}
+                onChange={(e) => updateField('appName', e.target.value)}
+              />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Add an image to this project's <code>src/assets/brands/&lt;name&gt;/</code> folder to have it show up above
-              automatically (see <code>demo/src/assets/brands/itzipper/</code> for a working example), reference any image path or
-              URL directly below, or use Upload to pick a file from your device.
+              automatically (see <code>demo/src/assets/brands/itzipper/</code> for a working example), or reference any image path
+              or URL directly below. You can also upload an image file; it will be stored with this form's brand data.
             </p>
           </div>
-          <ImageField
-            label="Logo (light mode)"
-            placeholder="/brands/acme/logo.svg"
-            value={fields.logoLight}
-            onChange={(value) => updateField('logoLight', value)}
-          />
-          <ImageField
-            label="Logo (dark mode)"
-            placeholder="Falls back to the light logo"
-            value={fields.logoDark}
-            onChange={(value) => updateField('logoDark', value)}
-          />
+          <div>
+            <ImageField
+              label="Logo (light mode)"
+              placeholder="/brands/acme/logo.svg"
+              value={fields.logoLight}
+              fieldKey="logoLight"
+              onChange={(value) => updateField('logoLight', value)}
+              onUpload={uploadFieldImage}
+              uploadState={uploadingField}
+              uploadError={uploadErrors.logoLight}
+              hint="If dark-mode logo is blank, this light logo is used there too."
+            />
+          </div>
+          <div>
+            <ImageField
+              label="Logo (dark mode)"
+              placeholder="Falls back to the light logo"
+              value={fields.logoDark}
+              fieldKey="logoDark"
+              onChange={(value) => updateField('logoDark', value)}
+              onUpload={uploadFieldImage}
+              uploadState={uploadingField}
+              uploadError={uploadErrors.logoDark}
+            />
+          </div>
           <div className="sm:col-span-2">
             <ImageField
               label="Favicon"
               placeholder="/brands/acme/favicon.svg"
               value={fields.favicon}
+              fieldKey="favicon"
               onChange={(value) => updateField('favicon', value)}
+              onUpload={uploadFieldImage}
+              uploadState={uploadingField}
+              uploadError={uploadErrors.favicon}
               hint="Shown as the browser tab icon while this form is open."
             />
           </div>
-          <ImageField
-            label="Background (light mode)"
-            placeholder="/brands/acme/background.png"
-            value={fields.backgroundLight}
-            onChange={(value) => updateField('backgroundLight', value)}
-          />
-          <ImageField
-            label="Background (dark mode)"
-            placeholder="/brands/acme/background-dark.png"
-            value={fields.backgroundDark}
-            onChange={(value) => updateField('backgroundDark', value)}
-          />
+          <div>
+            <ImageField
+              label="Background (light mode)"
+              placeholder="/brands/acme/background.png"
+              value={fields.backgroundLight}
+              fieldKey="backgroundLight"
+              onChange={(value) => updateField('backgroundLight', value)}
+              onUpload={uploadFieldImage}
+              uploadState={uploadingField}
+              uploadError={uploadErrors.backgroundLight}
+            />
+          </div>
+          <div>
+            <ImageField
+              label="Background (dark mode)"
+              placeholder="/brands/acme/background-dark.png"
+              value={fields.backgroundDark}
+              fieldKey="backgroundDark"
+              onChange={(value) => updateField('backgroundDark', value)}
+              onUpload={uploadFieldImage}
+              uploadState={uploadingField}
+              uploadError={uploadErrors.backgroundDark}
+            />
+          </div>
           <div className="sm:col-span-2">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               A solid background color, independent of the image fields above — set one, the other, both (image shows over the
