@@ -78,7 +78,7 @@ function projectNameFor(form, projectsById) {
   return projectsById.get(form.projectId) ?? form.projectId
 }
 
-export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFill, onOpenResponses, onOpenSettings, fillBaseUrl }) {
+export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFill, onOpenResponses, onOpenSettings, fillBaseUrl, detectedBrands }) {
   const [forms, setForms] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -132,6 +132,19 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   }
 
   const projectsById = new Map(projects.map((project) => [project.id, project.name]))
+  const detectedBrandsBySlug = new Map((detectedBrands ?? []).map((preset) => [preset.slug, preset.brand.appName || preset.slug]))
+  const projectFilterOptions = [
+    ...projects.map((project) => ({ value: project.id, label: project.name })),
+    ...(detectedBrands ?? []).map((preset) => ({ value: preset.slug, label: preset.brand.appName || preset.slug })),
+    ...Array.from(new Set(forms.map((form) => form.projectId).filter(Boolean))).map((projectId) => ({
+      value: projectId,
+      label: projectsById.get(projectId) ?? detectedBrandsBySlug.get(projectId) ?? projectId,
+    })),
+  ].filter(
+    (option, index, all) =>
+      option.value &&
+      all.findIndex((candidate) => candidate.value === option.value) === index,
+  )
 
   const visibleForms = forms
     .filter((form) => matchesSearch(form, searchText) && matchesStatusFilter(form, statusFilter) && matchesProjectFilter(form, projectFilter))
@@ -470,9 +483,9 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
             <select className={filterInputClass} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
               <option value="all">All projects</option>
               <option value="unassigned">Unassigned</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
+              {projectFilterOptions.map((project) => (
+                <option key={project.value} value={project.value}>
+                  {project.label}
                 </option>
               ))}
             </select>
