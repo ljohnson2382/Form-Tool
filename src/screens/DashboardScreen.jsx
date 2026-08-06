@@ -67,34 +67,6 @@ const SORT_OPTIONS = {
   QUESTIONS_ASC: 'questions_asc',
 }
 
-// Groups by an arbitrary key, "Unassigned" bucket last rather than
-// scattered alphabetically — same rule for project as for audience.
-function groupBy(forms, keyFn) {
-  const groups = new Map()
-  for (const form of forms) {
-    const key = keyFn(form) || 'Unassigned'
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(form)
-  }
-  return [...groups.entries()].sort(([a], [b]) => {
-    if (a === 'Unassigned') return 1
-    if (b === 'Unassigned') return -1
-    return a.localeCompare(b)
-  })
-}
-
-// Forms with no projectId set (the common case until someone starts using
-// the field) land in one "Unassigned" group at the end. Within each
-// project, a second level groups by audience (who the form is actually
-// for — "Participant", "Moderator", etc., see formSchema.js) the same way —
-// this is what makes "which link goes to which audience" visible at a
-// glance instead of one flat list per project.
-function groupByProjectAndAudience(forms) {
-  return groupBy(forms, (form) => form.projectId).map(([project, projectForms]) => [
-    project,
-    groupBy(projectForms, (form) => form.audience),
-  ])
-}
 
 export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFill, onOpenResponses, onOpenSettings, fillBaseUrl }) {
   const [forms, setForms] = useState([])
@@ -501,22 +473,8 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
           No forms match your current search/filter settings.
         </Card>
       ) : (
-        <div className="space-y-8">
-          {groupByProjectAndAudience(visibleForms).map(([project, audienceGroups]) => (
-            <div key={project}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{project}</h2>
-              <div className="space-y-5">
-                {audienceGroups.map(([audience, audienceForms]) => (
-                  <div key={audience}>
-                    {audienceGroups.length > 1 && (
-                      <h3 className="mb-2 text-xs font-semibold text-slate-400 dark:text-slate-500">{audience}</h3>
-                    )}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{audienceForms.map(renderFormCard)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {visibleForms.map(renderFormCard)}
         </div>
       )}
 
