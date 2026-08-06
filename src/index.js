@@ -21,6 +21,7 @@ export {
   createItem,
   createSection,
   createEmptyForm,
+  createEmptyProject,
   isAnswerable,
   countQuestions,
   validateResponses,
@@ -31,7 +32,7 @@ export {
   itemsOf,
 } from './data/formSchema.js'
 
-export { normalizeForm, FormValidationError } from './data/formValidation.js'
+export { normalizeForm, normalizeProject, FormValidationError } from './data/formValidation.js'
 
 export { configureStorage } from './utils/db.js'
 export { configureBackend } from './utils/backendConfig.js'
@@ -57,6 +58,8 @@ export {
   deleteResponsesForForm,
   exportResponsesToFile,
 } from './utils/responseStore.js'
+
+export { listProjects, getProject, saveProject, deleteProject } from './utils/projectStore.js'
 
 export {
   supportsFileSystemAccess,

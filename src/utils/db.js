@@ -1,5 +1,5 @@
 const BASE_DB_NAME = 'form-builder-db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 let dbName = BASE_DB_NAME
 let dbPromise = null
@@ -53,6 +53,13 @@ export function openDb() {
       // isn't scoped to a form at all.
       if (!db.objectStoreNames.contains('appSettings')) {
         db.createObjectStore('appSettings', { keyPath: 'id' })
+      }
+      // Saved, reusable brands — see utils/projectStore.js and
+      // createEmptyProject in data/formSchema.js. Separate from `forms`:
+      // a project isn't a form, it's something a form's projectId can point
+      // to for a one-click branding apply.
+      if (!db.objectStoreNames.contains('projects')) {
+        db.createObjectStore('projects', { keyPath: 'id' })
       }
     }
     request.onsuccess = () => resolve(request.result)

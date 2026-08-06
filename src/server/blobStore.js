@@ -6,7 +6,7 @@
 
 import { put, head, del, BlobNotFoundError } from '@vercel/blob'
 import { createId } from '../data/formSchema.js'
-import { normalizeForm } from '../data/formValidation.js'
+import { normalizeForm, normalizeProject } from '../data/formValidation.js'
 
 function formsPath(id) {
   return `forms/${id}.json`
@@ -15,6 +15,11 @@ function formsPath(id) {
 function responsesPath(formId) {
   return `responses/${formId}.json`
 }
+
+// A handful of admin-managed records (utils/projectStore.js) — one shared
+// array, same reasoning as responsesPath: nothing here needs per-record
+// querying, just "list them all" and "replace the whole list."
+const PROJECTS_PATH = 'projects.json'
 
 // Blobs are created with a fixed pathname (no random suffix) so publishing
 // the same form twice overwrites its one published copy rather than piling
@@ -61,6 +66,29 @@ export async function deletePublishedForm(id) {
     if (err instanceof BlobNotFoundError) return
     throw err
   }
+}
+
+export async function listProjects() {
+  const raw = await getJson(PROJECTS_PATH)
+  return Array.isArray(raw) ? raw.map((p) => normalizeProject(p)) : []
+}
+
+export async function getProject(id) {
+  const projects = await listProjects()
+  return projects.find((p) => p.id === id) ?? null
+}
+
+export async function putProject(project) {
+  const normalized = normalizeProject(project)
+  const projects = await listProjects()
+  const withoutExisting = projects.filter((p) => p.id !== normalized.id)
+  await putJson(PROJECTS_PATH, [...withoutExisting, normalized])
+  return normalized
+}
+
+export async function deleteProject(id) {
+  const projects = await listProjects()
+  await putJson(PROJECTS_PATH, projects.filter((p) => p.id !== id))
 }
 
 export async function listResponsesFor(formId) {

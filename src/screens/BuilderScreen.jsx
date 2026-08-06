@@ -6,6 +6,7 @@ import BrandEditor from '../components/builder/BrandEditor'
 import PublishedLinkModal from '../components/common/PublishedLinkModal'
 import SplitIntoStagesModal from '../components/builder/SplitIntoStagesModal'
 import { getForm, saveForm, publishForm } from '../utils/formStore'
+import { listProjects } from '../utils/projectStore'
 import { hasBackend } from '../utils/backendConfig'
 import { fillUrlFor } from '../utils/fillLink'
 import { createSection, createId } from '../data/formSchema'
@@ -24,6 +25,7 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
   const [error, setError] = useState('')
   const [publishedLink, setPublishedLink] = useState(null)
   const [splitting, setSplitting] = useState(false)
+  const [projects, setProjects] = useState([])
   const brandSectionRef = useRef(null)
 
   useEffect(() => {
@@ -46,6 +48,14 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
       cancelled = true
     }
   }, [formId])
+
+  // Not scoped to formId — the saved Project list is the same regardless of
+  // which form is open, so this only needs to run once per mount.
+  useEffect(() => {
+    listProjects()
+      .then(setProjects)
+      .catch(() => {}) // Non-critical: the branding panel just shows no "Your Projects" presets.
+  }, [])
 
   // Fires once the form has actually loaded, and again on every edit, so the
   // Branding panel previews live in the surrounding chrome (header/
@@ -252,12 +262,24 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            className={`${inputClass} text-sm`}
-            placeholder="Project (optional, e.g. itzipper)"
-            value={form.projectId ?? ''}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-          />
+          <div className={`${inputClass} flex items-center justify-between gap-2 text-sm`}>
+            {form.projectId ? (
+              <>
+                <span className="truncate text-slate-700 dark:text-slate-200">
+                  Project: <span className="font-medium">{projects.find((p) => p.id === form.projectId)?.name ?? form.projectId}</span>
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 text-xs text-slate-500 underline hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  onClick={() => setForm({ ...form, projectId: null })}
+                >
+                  Unassign
+                </button>
+              </>
+            ) : (
+              <span className="text-slate-400 dark:text-slate-500">No project — apply one below in Branding, or leave unassigned.</span>
+            )}
+          </div>
           <input
             className={`${inputClass} text-sm`}
             placeholder="Audience (optional, e.g. Participant)"
@@ -268,7 +290,20 @@ export default function BuilderScreen({ formId, onBack, onPreview, onBrandLoaded
       </div>
 
       <div ref={brandSectionRef} className="mb-4 scroll-mt-24">
-        <BrandEditor brand={form.brand} onChange={(brand) => setForm({ ...form, brand })} detectedBrands={detectedBrands} />
+        <BrandEditor
+          brand={form.brand}
+          // Functional updates here, not the `{ ...form, ... }` style used
+          // elsewhere in this file — applying a saved Project fires this and
+          // onApplyProject back to back in the same tick (see BrandEditor.jsx's
+          // applyProject), both against the same stale `form` closure. Reading
+          // off the actual previous state instead of that closure is what lets
+          // both updates land instead of the second silently clobbering the
+          // first.
+          onChange={(brand) => setForm((prev) => ({ ...prev, brand }))}
+          detectedBrands={detectedBrands}
+          savedProjects={projects}
+          onApplyProject={(project) => setForm((prev) => ({ ...prev, projectId: project.id }))}
+        />
       </div>
 
       <div className="space-y-4">

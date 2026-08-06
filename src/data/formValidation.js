@@ -131,3 +131,25 @@ export function normalizeForm(raw, { strict = false } = {}) {
     brand: normalizeBrand(raw.brand),
   }
 }
+
+/**
+ * Same "repair, don't throw" storage-boundary normalization as normalizeForm,
+ * for the Project entity (utils/projectStore.js) — see createEmptyProject in
+ * formSchema.js for what a Project is and how it relates to form.projectId.
+ */
+export function normalizeProject(raw) {
+  const now = new Date().toISOString()
+  const isPlainObject = raw && typeof raw === 'object' && !Array.isArray(raw)
+
+  if (!isPlainObject) {
+    return { id: createId('project'), name: 'Untitled Project', brand: null, createdAt: now, updatedAt: now }
+  }
+
+  return {
+    id: toText(raw.id) || createId('project'),
+    name: toText(raw.name, 'Untitled Project'),
+    brand: normalizeBrand(raw.brand),
+    createdAt: toText(raw.createdAt) || now,
+    updatedAt: toText(raw.updatedAt) || now,
+  }
+}

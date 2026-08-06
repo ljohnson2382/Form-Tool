@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Button from '../components/common/Button'
 import BrandEditor from '../components/builder/BrandEditor'
+import ProjectsPanel from '../components/builder/ProjectsPanel'
 import { getAppBrand, saveAppBrand } from '../utils/appSettings'
 
 /**
@@ -75,6 +76,10 @@ export default function AdminSettingsScreen({ onBack, onSaved, detectedBrands })
         appNamePlaceholder="e.g. Form Designer"
         detectedBrands={detectedBrands}
       />
+
+      <div className="mt-8">
+        <ProjectsPanel detectedBrands={detectedBrands} />
+      </div>
     </div>
   )
 }

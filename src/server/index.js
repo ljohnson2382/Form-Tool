@@ -2,6 +2,7 @@ export { createFormsHandler } from './formsHandler.js'
 export { createResponsesHandler } from './responsesHandler.js'
 export { createDraftsHandler } from './draftsHandler.js'
 export { createSettingsHandler } from './settingsHandler.js'
+export { createProjectsHandler } from './projectsHandler.js'
 export { toAzureFunctionHandler } from './azureFunctionsAdapter.js'
 
 // Reference storage implementations — pass one as `store` to either handler

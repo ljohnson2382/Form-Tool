@@ -16,6 +16,7 @@ import {
   migrateFormsToBackend,
 } from '../utils/formStore'
 import { deleteResponsesForForm } from '../utils/responseStore'
+import { listProjects } from '../utils/projectStore'
 import { hasBackend } from '../utils/backendConfig'
 import { FormValidationError } from '../data/formValidation'
 import {
@@ -77,11 +78,16 @@ function groupBy(forms, keyFn) {
 // for — "Participant", "Moderator", etc., see formSchema.js) the same way —
 // this is what makes "which link goes to which audience" visible at a
 // glance instead of one flat list per project.
-function groupByProjectAndAudience(forms) {
-  return groupBy(forms, (form) => form.projectId).map(([project, projectForms]) => [
-    project,
-    groupBy(projectForms, (form) => form.audience),
-  ])
+//
+// `projects` resolves a form's projectId to that saved Project's name (see
+// ProjectsPanel.jsx) for the group heading — a form whose projectId doesn't
+// match any saved Project (typed by hand before Projects existed, or since
+// deleted) still groups fine, just under its raw projectId string.
+function groupByProjectAndAudience(forms, projects) {
+  const nameById = new Map(projects.map((project) => [project.id, project.name]))
+  return groupBy(forms, (form) => (form.projectId ? (nameById.get(form.projectId) ?? form.projectId) : null)).map(
+    ([project, projectForms]) => [project, groupBy(projectForms, (form) => form.audience)],
+  )
 }
 
 export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFill, onOpenResponses, onOpenSettings, fillBaseUrl }) {
@@ -95,6 +101,7 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
   const [migratable, setMigratable] = useState([])
   const [migrating, setMigrating] = useState(null)
   const [publishedLink, setPublishedLink] = useState(null)
+  const [projects, setProjects] = useState([])
   const fileInputRef = useRef(null)
   const markdownInputRef = useRef(null)
 
@@ -112,8 +119,19 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
     setMigratable(await listMigratableForms())
   }
 
+  // Only needed to resolve group headings (see groupByProjectAndAudience) —
+  // not critical if it fails, the grouping just falls back to raw projectId
+  // strings.
+  async function refreshProjects() {
+    try {
+      setProjects(await listProjects())
+    } catch {
+      // Non-critical — see above.
+    }
+  }
+
   useEffect(() => {
-    Promise.all([refresh(), refreshMigratable()]).finally(() => setLoading(false))
+    Promise.all([refresh(), refreshMigratable(), refreshProjects()]).finally(() => setLoading(false))
   }, [])
 
   async function handleCreate() {
@@ -420,7 +438,7 @@ export default function DashboardScreen({ onOpenBuilder, onOpenPreview, onOpenFi
         </Card>
       ) : (
         <div className="space-y-8">
-          {groupByProjectAndAudience(forms).map(([project, audienceGroups]) => (
+          {groupByProjectAndAudience(forms, projects).map(([project, audienceGroups]) => (
             <div key={project}>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{project}</h2>
               <div className="space-y-5">

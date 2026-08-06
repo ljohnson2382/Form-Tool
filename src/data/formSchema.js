@@ -166,6 +166,20 @@ export function createEmptyForm(title = 'Untitled Form') {
   }
 }
 
+/**
+ * A saved, reusable brand — created once from Global Settings (see
+ * ProjectsPanel.jsx), then applied to any form from BuilderScreen.jsx's
+ * branding panel. Distinct from `form.projectId`, the plain grouping label
+ * every form already has: applying a Project sets both — the form's brand
+ * becomes a copy of the project's (still editable after, same as any other
+ * preset), and its projectId becomes this project's id, so Dashboard
+ * grouping and (once a backend is configured) publishing pick it up too.
+ */
+export function createEmptyProject(name = 'Untitled Project') {
+  const now = new Date().toISOString()
+  return { id: createId('project'), name, brand: null, createdAt: now, updatedAt: now }
+}
+
 export function isAnswerable(item) {
   return item?.type !== QUESTION_TYPES.SECTION_HEADER
 }
