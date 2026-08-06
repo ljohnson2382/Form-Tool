@@ -275,6 +275,7 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
               onOpenResponses={openResponses}
               onOpenSettings={openSettings}
               fillBaseUrl={fillBaseUrl}
+              detectedBrands={detectedBrands}
             />
           ) : view === VIEWS.BUILDER ? (
             <BuilderScreen
