@@ -35,6 +35,12 @@ function adminHeaders(extra = {}) {
   return { ...extra, 'x-admin-token': getAdminToken() }
 }
 
+function normalizeWithPublishedAt(form) {
+  const normalized = normalizeForm(form)
+  const publishedAt = typeof form?.publishedAt === 'string' && form.publishedAt.trim() ? form.publishedAt : null
+  return { ...normalized, publishedAt }
+}
+
 async function listDraftsBackend() {
   return apiRequest('/drafts', { headers: adminHeaders() })
 }
@@ -65,7 +71,7 @@ async function getLocalForm(id) {
 export async function listForms() {
   if (hasBackend()) {
     const drafts = await listDraftsBackend()
-    return drafts.map((form) => normalizeForm(form)).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    return drafts.map((form) => normalizeWithPublishedAt(form)).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
   }
   const db = await openDb()
   const forms = await promisifyRequest(db.transaction('forms', 'readonly').objectStore('forms').getAll())
@@ -117,7 +123,7 @@ export async function getForm(id) {
     // respondents; the actual security boundary is server-side either way.
     if (getAdminToken()) {
       const draft = await getDraftBackend(id)
-      if (draft) return draft
+      if (draft) return normalizeWithPublishedAt(draft)
       // Falls through: a form that only ever exists as a published
       // snapshot (published before this migration, or with no backend
       // draft counterpart) still resolves for Preview/Fill Out.
