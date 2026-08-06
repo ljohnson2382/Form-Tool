@@ -210,9 +210,14 @@ export default function BrandEditor({
   // A saved Project (see ProjectsPanel.jsx) is the same one-click apply as a
   // detected preset, plus onApplyProject — BuilderScreen.jsx uses that to
   // also link the form to the project (form.projectId), not just copy its
-  // colors/images.
+  // colors/images. Falls back appName to the project's own name when the
+  // project's brand doesn't set one explicitly — matches what
+  // ProjectEditorModal.jsx's App name placeholder already promises
+  // ("defaults to the project name above"), applied at this one-click-copy
+  // point rather than baked into the stored project itself, so a later
+  // rename of the project is reflected the next time it's applied.
   function applyProject(project) {
-    onChange(project.brand ? { ...project.brand } : null)
+    onChange(project.brand ? { ...project.brand, appName: project.brand.appName || project.name } : null)
     onApplyProject?.(project)
   }
 
