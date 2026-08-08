@@ -39,8 +39,16 @@ export function createProjectsHandler({ adminToken, allowedOrigin, store = blobS
     }
 
     if (req.method === 'POST') {
-      const project = await store.putProject(req.body)
-      return res.status(200).json(project)
+      // Unlike formsHandler.js/draftsHandler.js's equivalent, this had no
+      // try/catch — an oversized document (e.g. an inline brand image over
+      // Cosmos's 2MB item limit, see BrandEditor.jsx) threw unhandled and
+      // surfaced as a raw, message-less 500 instead of a clean error (#39).
+      try {
+        const project = await store.putProject(req.body)
+        return res.status(200).json(project)
+      } catch (err) {
+        return res.status(400).json({ error: 'Could not save project.' })
+      }
     }
 
     if (req.method === 'DELETE') {

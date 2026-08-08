@@ -8,7 +8,14 @@ const inputClass =
 const labelClass = 'mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400'
 
 const DEFAULT_PICKER_COLOR = '#6366f1'
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+// Images are stored inline as base64 on the brand object (see
+// readFileAsDataUrl below) — there's no separate blob storage yet (#40).
+// A brand has up to 5 image fields (logoLight/logoDark/favicon/
+// backgroundLight/backgroundDark), and the Cosmos-backed deployment hard-
+// caps a single document at 2MB. Base64 inflates raw bytes by ~4/3, so this
+// cap keeps even all 5 fields maxed out (5 * 200KB * 4/3 ≈ 1.37MB) safely
+// under that limit with room for the document's other fields (#39).
+const MAX_IMAGE_BYTES = 200 * 1024
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
