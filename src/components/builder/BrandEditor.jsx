@@ -105,6 +105,10 @@ function ImageField({ label, value, placeholder, fieldKey, onChange, onUpload, u
           Clear
         </button>
       </div>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        Uploaded images are stored with this data, so they're capped at {formatBytes(MAX_IMAGE_BYTES)} — for a larger image,
+        host it elsewhere and paste its URL above instead.
+      </p>
       {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
       {uploadError ? <p className="mt-1 text-xs text-red-600 dark:text-red-300">{uploadError}</p> : null}
     </div>
@@ -304,7 +308,8 @@ export default function BrandEditor({
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Add an image to this project's <code>src/assets/brands/&lt;name&gt;/</code> folder to have it show up above
               automatically (see <code>demo/src/assets/brands/itzipper/</code> for a working example), or reference any image path
-              or URL directly below. You can also upload an image file; it will be stored with this form's brand data.
+              or URL directly below. You can also upload an image file, but it's stored with this form's brand data and capped at{' '}
+              {formatBytes(MAX_IMAGE_BYTES)} per image — for larger images, host them elsewhere and paste the URL instead.
             </p>
           </div>
           <div>
