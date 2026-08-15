@@ -10,10 +10,10 @@ function folderSlug(path) {
 }
 
 // Heuristic, not a fixed filename — "logo" / "background" (or "bg") plus
-// "dark" anywhere in the name, in any order, any extension. Matches how the
-// existing itzipper folder was actually named (background.light.png,
-// itzipper-logo-dark.svg) without requiring anyone to rename files to fit a
-// rigid scheme.
+// "dark" anywhere in the name, in any order, any extension. Matches real-
+// world variation in how a brand folder's files actually get named
+// (background.light.png, acme-logo-dark.svg) without requiring anyone to
+// rename files to fit a rigid scheme.
 function classify(filename) {
   const lower = filename.toLowerCase()
   const isDark = lower.includes('dark')

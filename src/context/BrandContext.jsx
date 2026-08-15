@@ -110,8 +110,8 @@ export function BrandProvider({ brand, children }) {
   }, [merged, inherited])
 
   // Swaps the actual browser-tab favicon (index.html only ever declares a
-  // static placeholder per app — see demo/index.html, steadytech-forms/
-  // index.html) to whatever this brand sets. Only acts when a favicon is
+  // static placeholder per app — see demo/index.html, fill/index.html) to
+  // whatever this brand sets. Only acts when a favicon is
   // actually set anywhere in the chain — `merged.favicon` already carries
   // the inherited value if this level doesn't override it (pickSetFields),
   // so the common case (no favicon configured at any level) never touches

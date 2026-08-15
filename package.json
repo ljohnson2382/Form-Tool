@@ -1,7 +1,7 @@
 {
   "name": "form-builder-kit",
   "version": "0.1.0",
-  "description": "Embeddable Microsoft Forms-style form/survey builder — brandable, storage-agnostic, drop into any React project.",
+  "description": "Embeddable Microsoft Forms-style form/survey builder \u2014 brandable, storage-agnostic, drop into any React project.",
   "type": "module",
   "main": "./dist/form-builder-kit.js",
   "module": "./dist/form-builder-kit.js",
@@ -23,8 +23,7 @@
   },
   "dependencies": {
     "marked": "^15.0.0",
-    "@vercel/blob": "^2.6.1",
-    "@azure/cosmos": "^4.10.0"
+    "@vercel/blob": "^2.6.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

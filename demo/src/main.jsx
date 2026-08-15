@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import 'form-builder-kit/style.css'
 import { FormBuilderApp, MODES, parseDetectedBrands } from 'form-builder-kit'
 import { stagingBrand } from './brands/staging.js'
-import { itzipperUatSurvey } from './seeds'
+import { sampleFeedbackSurvey } from './seeds'
 
 // Any src/assets/brands/<slug>/ folder becomes a one-click preset in the
 // Builder's branding panel (see BrandEditor.jsx) — this glob call has to
@@ -20,7 +20,7 @@ const detectedBrands = parseDetectedBrands(import.meta.glob('/src/assets/brands/
 // the server has to enforce the split too. This is a demo of the surfaces.
 const params = new URLSearchParams(window.location.search)
 const mode = params.get('mode') === 'fill' ? MODES.FILL : MODES.ADMIN
-const formId = params.get('formId') ?? itzipperUatSurvey.id
+const formId = params.get('formId') ?? sampleFeedbackSurvey.id
 
 // VITE_API_BASE_URL, if set, points both surfaces at a real backend (see
 // src/server/ in the kit and the README's deployment runbook) instead of
@@ -35,7 +35,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <FormBuilderApp
       brand={stagingBrand}
-      seedForms={[itzipperUatSurvey]}
+      seedForms={[sampleFeedbackSurvey]}
       mode={mode}
       formId={formId}
       apiBaseUrl={apiBaseUrl}

@@ -1,1 +1,1 @@
-export { itzipperUatSurvey } from './itzipperUatSurvey.js'
+export { sampleFeedbackSurvey } from './sampleFeedbackSurvey.js'
