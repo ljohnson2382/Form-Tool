@@ -336,6 +336,13 @@ function AdminShell({ seedForms, fillBaseUrl, detectedBrands, onAppBrandSaved })
  * - `adminToken` — required alongside `apiBaseUrl` in 'admin' mode to
  *   publish/unpublish forms and read collected responses. Never pass this to
  *   a 'fill' mount: it would ship the secret to every respondent's browser.
+ * - `backendReadOnly` — for a backend that's read-only at the database level
+ *   (e.g. a Cosmos DB read-only key pointed at another deployment's real
+ *   data). Reads still hit the backend; every write (saveForm, submitResponse,
+ *   saveProject, saveAppBrand, and their deletes) falls back to this
+ *   browser's IndexedDB instead, with local always checked first on read —
+ *   see backendConfig.js. publishForm/unpublishForm have no local
+ *   equivalent and just fail with a clear error instead.
  * - `fillBaseUrl` — admin mode only: the origin respondents are sent to
  *   (e.g. `https://forms.itzipper.com`), used to build the "Copy link"
  *   shareable URL after publishing. Has no effect without `apiBaseUrl`.
@@ -359,13 +366,17 @@ export default function FormBuilderApp({
   storageNamespace,
   apiBaseUrl,
   adminToken,
+  backendReadOnly = false,
   fillBaseUrl,
   detectedBrands,
 }) {
   // Runs during render, so storage is pointed at the right database/backend
   // before any child effect can open it.
   useMemo(() => configureStorage({ namespace: storageNamespace }), [storageNamespace])
-  useMemo(() => configureBackend({ apiBaseUrl, adminToken }), [apiBaseUrl, adminToken])
+  useMemo(
+    () => configureBackend({ apiBaseUrl, adminToken, readOnly: backendReadOnly }),
+    [apiBaseUrl, adminToken, backendReadOnly],
+  )
 
   const [effectiveBrand, setEffectiveBrand] = useState(null)
   // Nothing renders until this flips true (see the blank-screen return

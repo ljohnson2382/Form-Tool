@@ -1,7 +1,7 @@
 import { openDb, promisifyRequest } from './db'
 import { createId } from '../data/formSchema'
 import { normalizeForm } from '../data/formValidation'
-import { getApiBaseUrl, getAdminToken, hasBackend } from './backendConfig'
+import { getApiBaseUrl, getAdminToken, hasBackend, isBackendReadOnly } from './backendConfig'
 
 // Each form is stored as its own independent record — never merged into a
 // single blob — so forms can be listed, duplicated, and deleted individually.
@@ -68,14 +68,31 @@ async function getLocalForm(id) {
   return form ? normalizeForm(form) : null
 }
 
-export async function listForms() {
-  if (hasBackend()) {
-    const drafts = await listDraftsBackend()
-    return drafts.map((form) => normalizeWithPublishedAt(form)).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-  }
+async function listLocalFormsRaw() {
   const db = await openDb()
   const forms = await promisifyRequest(db.transaction('forms', 'readonly').objectStore('forms').getAll())
-  return forms.map((form) => normalizeForm(form)).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+  return forms.map((form) => normalizeForm(form))
+}
+
+export async function listForms() {
+  if (hasBackend()) {
+    const drafts = (await listDraftsBackend()).map((form) => normalizeWithPublishedAt(form))
+    // Read-only backend: a local copy (created or edited on this browser,
+    // since the real backend can't be written to) always wins over the
+    // backend's copy of the same id, and local-only forms — never seen by
+    // the backend at all — are included too. Without this, listForms()
+    // would only ever show prod's real data, and anything saveForm() wrote
+    // locally would be invisible.
+    if (isBackendReadOnly()) {
+      const localForms = await listLocalFormsRaw()
+      const merged = new Map(drafts.map((form) => [form.id, form]))
+      for (const form of localForms) merged.set(form.id, { ...form, publishedAt: null })
+      return [...merged.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    }
+    return drafts.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+  }
+  const forms = await listLocalFormsRaw()
+  return forms.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
 }
 
 // Always reads local IndexedDB directly, ignoring hasBackend() — the only
@@ -91,7 +108,9 @@ export async function listLocalForms() {
 // "Migrate to database" action would affect. Safe to call on every Dashboard
 // load; local copies are never deleted, so this naturally stays accurate.
 export async function listMigratableForms() {
-  if (!hasBackend()) return []
+  // Migrating writes local forms *to* the backend — meaningless (and
+  // unsafe to even offer) when the backend can't be written to.
+  if (!hasBackend() || isBackendReadOnly()) return []
   const localForms = await listLocalForms()
   const candidates = []
   for (const form of localForms) {
@@ -117,6 +136,13 @@ export async function migrateFormsToBackend(forms, onProgress) {
 
 export async function getForm(id) {
   if (hasBackend()) {
+    // Read-only backend: a local copy always wins, same reasoning as
+    // listForms() above — it's the only place an edit or a brand-new form
+    // could actually have been persisted.
+    if (isBackendReadOnly()) {
+      const local = await getLocalForm(id)
+      if (local) return local
+    }
     // Real admin sessions carry a token; anonymous fill-mode respondents
     // never do (see FormBuilderApp.jsx — a fill mount is never configured
     // with one). Checking first just skips a guaranteed 401 for
@@ -143,8 +169,10 @@ export async function getForm(id) {
 export async function saveForm(form, { touch = true } = {}) {
   const normalized = normalizeForm(form)
   const updated = touch ? { ...normalized, updatedAt: new Date().toISOString() } : normalized
-  if (hasBackend()) return await putDraftBackend(updated)
+  if (hasBackend() && !isBackendReadOnly()) return await putDraftBackend(updated)
 
+  // No backend, or a read-only one: this browser's IndexedDB is the only
+  // place that can actually be written to.
   const db = await openDb()
   const store = db.transaction('forms', 'readwrite').objectStore('forms')
   await promisifyRequest(store.put(updated))
@@ -152,8 +180,13 @@ export async function saveForm(form, { touch = true } = {}) {
 }
 
 export async function deleteForm(id) {
-  if (hasBackend()) return await deleteDraftBackend(id)
+  if (hasBackend() && !isBackendReadOnly()) return await deleteDraftBackend(id)
 
+  // Read-only backend: this only ever clears a local override (there's no
+  // way to actually delete the real backend's copy), so the backend's
+  // version of this form reappears on the next read — which is exactly
+  // right, since a read-only environment was never able to delete it for
+  // real in the first place.
   const db = await openDb()
   const tx = db.transaction(['forms', 'publishState'], 'readwrite')
   await Promise.all([promisifyRequest(tx.objectStore('forms').delete(id)), promisifyRequest(tx.objectStore('publishState').delete(id))])
@@ -227,6 +260,12 @@ export async function seedIfEmpty(seedForms) {
  * no separate local bookkeeping to keep in sync.
  */
 export async function publishForm(form) {
+  // Unlike saveForm/deleteForm, there's no local fallback that means
+  // anything here — publishing is inherently "make this the live copy real
+  // respondents fetch," which only the real backend can do. A read-only
+  // backend fails this outright rather than silently no-op or attempt (and
+  // get rejected by) a real write.
+  if (isBackendReadOnly()) throw new Error('Publishing is disabled on this read-only environment.')
   return await apiRequest('/forms', {
     method: 'POST',
     headers: adminHeaders({ 'Content-Type': 'application/json' }),
@@ -239,6 +278,7 @@ export async function publishForm(form) {
  * responses already collected for it.
  */
 export async function unpublishForm(id) {
+  if (isBackendReadOnly()) throw new Error('Unpublishing is disabled on this read-only environment.')
   await apiRequest(`/forms?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: adminHeaders(),

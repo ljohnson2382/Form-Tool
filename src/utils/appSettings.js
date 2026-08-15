@@ -1,6 +1,6 @@
 import { openDb, promisifyRequest } from './db'
 import { normalizeBrand } from '../data/formSchema'
-import { getApiBaseUrl, getAdminToken, hasBackend } from './backendConfig'
+import { getApiBaseUrl, getAdminToken, hasBackend, isBackendReadOnly } from './backendConfig'
 
 const RECORD_ID = 'app'
 
@@ -24,20 +24,30 @@ async function apiRequest(path, options = {}) {
  * form-specific brand still needs the app's shell brand) so a customized
  * brand is consistent across every device, not just the one that saved it.
  */
-export async function getAppBrand() {
-  if (hasBackend()) {
-    const settings = await apiRequest('/settings')
-    return settings.brand ?? null
-  }
+async function getLocalAppBrand() {
   const db = await openDb()
   const store = db.transaction('appSettings', 'readonly').objectStore('appSettings')
   const record = await promisifyRequest(store.get(RECORD_ID))
   return record ? normalizeBrand(record.brand) : null
 }
 
+export async function getAppBrand() {
+  if (hasBackend()) {
+    // Read-only backend: a local override (see saveAppBrand below) always
+    // wins, same reasoning as every other store here.
+    if (isBackendReadOnly()) {
+      const local = await getLocalAppBrand()
+      if (local) return local
+    }
+    const settings = await apiRequest('/settings')
+    return settings.brand ?? null
+  }
+  return getLocalAppBrand()
+}
+
 export async function saveAppBrand(brand) {
   const normalized = normalizeBrand(brand)
-  if (hasBackend()) {
+  if (hasBackend() && !isBackendReadOnly()) {
     const settings = await apiRequest('/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': getAdminToken() },

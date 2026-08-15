@@ -8,7 +8,7 @@
 import { openDb, promisifyRequest } from './db'
 import { createId } from '../data/formSchema'
 import { saveJsonToFile } from './fileStorage'
-import { getApiBaseUrl, getAdminToken, hasBackend } from './backendConfig'
+import { getApiBaseUrl, getAdminToken, hasBackend, isBackendReadOnly } from './backendConfig'
 
 async function apiRequest(path, options = {}) {
   const res = await fetch(`${getApiBaseUrl()}${path}`, options)
@@ -20,14 +20,23 @@ async function apiRequest(path, options = {}) {
   return res.json()
 }
 
+async function listLocalResponses(formId) {
+  const db = await openDb()
+  const store = db.transaction('responses', 'readonly').objectStore('responses')
+  const index = store.index('formId')
+  return promisifyRequest(index.getAll(formId))
+}
+
 export async function submitResponse(formId, answers) {
-  if (hasBackend()) {
+  if (hasBackend() && !isBackendReadOnly()) {
     return apiRequest('/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ formId, answers }),
     })
   }
+  // No backend, or a read-only one: a real submission can't be written to
+  // the real backend, so it's kept in this browser instead of being lost.
   const db = await openDb()
   const store = db.transaction('responses', 'readwrite').objectStore('responses')
   const response = {
@@ -45,12 +54,16 @@ export async function listResponses(formId) {
     const responses = await apiRequest(`/responses?formId=${encodeURIComponent(formId)}`, {
       headers: { 'x-admin-token': getAdminToken() },
     })
+    // Read-only backend: any test submissions landed in local IndexedDB
+    // (see submitResponse above) — without this, they'd never show up
+    // alongside the real backend's responses.
+    if (isBackendReadOnly()) {
+      const local = await listLocalResponses(formId)
+      return [...responses, ...local].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+    }
     return responses.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
   }
-  const db = await openDb()
-  const store = db.transaction('responses', 'readonly').objectStore('responses')
-  const index = store.index('formId')
-  const responses = await promisifyRequest(index.getAll(formId))
+  const responses = await listLocalResponses(formId)
   return responses.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
 }
 
