@@ -14,7 +14,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "prepare": "vite build"
   },
   "peerDependencies": {
     "react": "^19.0.0",
