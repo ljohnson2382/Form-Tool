@@ -3,6 +3,7 @@ export { createResponsesHandler } from './responsesHandler.js'
 export { createDraftsHandler } from './draftsHandler.js'
 export { createSettingsHandler } from './settingsHandler.js'
 export { createProjectsHandler } from './projectsHandler.js'
+export { createUploadHandler } from './uploadHandler.js'
 export { toAzureFunctionHandler } from './azureFunctionsAdapter.js'
 
 // Reference storage implementation — pass an object shaped like this as

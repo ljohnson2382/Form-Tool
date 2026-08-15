@@ -107,3 +107,16 @@ export async function appendResponse(formId, answers) {
   await putJson(responsesPath(formId), [...existing, response])
   return response
 }
+
+// A random path per upload (unlike forms/projects/responses above, which
+// use a fixed, predictable path so re-publishing overwrites in place) —
+// there's no "same logo" identity to overwrite; every upload is a new blob.
+export async function uploadImage(bytes, contentType) {
+  const ext = contentType.split('/')[1]?.split('+')[0] || 'bin'
+  const { url } = await put(`uploads/${createId('img')}.${ext}`, bytes, {
+    access: 'public',
+    contentType,
+    addRandomSuffix: false,
+  })
+  return url
+}

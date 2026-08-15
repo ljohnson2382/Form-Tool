@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Card from '../common/Card'
 import { deriveColorScale } from '../../utils/colorScale'
+import { getApiBaseUrl, getAdminToken, hasBackend } from '../../utils/backendConfig'
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:text-slate-100'
@@ -8,14 +9,22 @@ const inputClass =
 const labelClass = 'mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400'
 
 const DEFAULT_PICKER_COLOR = '#6366f1'
-// Images are stored inline as base64 on the brand object (see
-// readFileAsDataUrl below) — there's no separate blob storage yet (#40).
-// A brand has up to 5 image fields (logoLight/logoDark/favicon/
-// backgroundLight/backgroundDark), and the Cosmos-backed deployment hard-
-// caps a single document at 2MB. Base64 inflates raw bytes by ~4/3, so this
-// cap keeps even all 5 fields maxed out (5 * 200KB * 4/3 ≈ 1.37MB) safely
-// under that limit with room for the document's other fields (#39).
-const MAX_IMAGE_BYTES = 200 * 1024
+// With a backend configured, an upload goes to POST /api/upload (see
+// uploadHandler.js) and only the returned URL is stored on the brand
+// object — the 10MB cap here is just a sanity check against an accidental
+// giant file, not a hard technical limit (#40).
+//
+// With no backend, there's nowhere to upload to, so the file is inlined as
+// base64 directly on the brand object instead (see readFileAsDataUrl
+// below) — much tighter cap, because a brand has up to 5 image fields
+// (logoLight/logoDark/favicon/backgroundLight/backgroundDark) that could
+// all land on the same document, and the Cosmos-backed deployment (when a
+// backend *is* configured but the upload itself somehow isn't available)
+// hard-caps a single document at 2MB. Base64 inflates raw bytes by ~4/3, so
+// this cap keeps even all 5 fields maxed out (5 * 200KB * 4/3 ≈ 1.37MB)
+// safely under that limit with room for the document's other fields (#39).
+const MAX_UPLOAD_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_INLINE_IMAGE_BYTES = 200 * 1024
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
@@ -31,6 +40,22 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error('Could not read that file.'))
     reader.readAsDataURL(file)
   })
+}
+
+// The one non-JSON request in this app — see azureFunctionsAdapter.js,
+// which reads Content-Type to tell this apart from every other POST.
+async function uploadFileToBackend(file) {
+  const res = await fetch(`${getApiBaseUrl()}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type, 'x-admin-token': getAdminToken() },
+    body: file,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || 'Could not upload that image.')
+  }
+  const { url } = await res.json()
+  return url
 }
 
 function fieldsFromBrand(brand) {
@@ -106,8 +131,9 @@ function ImageField({ label, value, placeholder, fieldKey, onChange, onUpload, u
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        Uploaded images are stored with this data, so they're capped at {formatBytes(MAX_IMAGE_BYTES)} — for a larger image,
-        host it elsewhere and paste its URL above instead.
+        {hasBackend()
+          ? `Uploaded images are capped at ${formatBytes(MAX_UPLOAD_IMAGE_BYTES)}.`
+          : `Uploaded images are stored with this data, so they're capped at ${formatBytes(MAX_INLINE_IMAGE_BYTES)} — for a larger image, host it elsewhere and paste its URL above instead.`}
       </p>
       {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
       {uploadError ? <p className="mt-1 text-xs text-red-600 dark:text-red-300">{uploadError}</p> : null}
@@ -165,8 +191,9 @@ export default function BrandEditor({
       setUploadErrors((prev) => ({ ...prev, [key]: 'Please choose an image file.' }))
       return
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setUploadErrors((prev) => ({ ...prev, [key]: `Image is ${formatBytes(file.size)}. Max allowed is ${formatBytes(MAX_IMAGE_BYTES)}.` }))
+    const maxBytes = hasBackend() ? MAX_UPLOAD_IMAGE_BYTES : MAX_INLINE_IMAGE_BYTES
+    if (file.size > maxBytes) {
+      setUploadErrors((prev) => ({ ...prev, [key]: `Image is ${formatBytes(file.size)}. Max allowed is ${formatBytes(maxBytes)}.` }))
       return
     }
 
@@ -178,8 +205,8 @@ export default function BrandEditor({
       return next
     })
     try {
-      const dataUrl = await readFileAsDataUrl(file)
-      onChange({ ...(brand ?? {}), [key]: dataUrl })
+      const value = hasBackend() ? await uploadFileToBackend(file) : await readFileAsDataUrl(file)
+      onChange({ ...(brand ?? {}), [key]: value })
     } catch (err) {
       setUploadErrors((prev) => ({ ...prev, [key]: err?.message || 'Could not upload that image.' }))
     } finally {
@@ -307,9 +334,10 @@ export default function BrandEditor({
           <div className="sm:col-span-2">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Add an image to this project's <code>src/assets/brands/&lt;name&gt;/</code> folder to have it show up above
-              automatically (see <code>demo/src/assets/brands/itzipper/</code> for a working example), or reference any image path
-              or URL directly below. You can also upload an image file, but it's stored with this form's brand data and capped at{' '}
-              {formatBytes(MAX_IMAGE_BYTES)} per image — for larger images, host them elsewhere and paste the URL instead.
+              automatically, or reference any image path or URL directly below.{' '}
+              {hasBackend()
+                ? `You can also upload an image file, capped at ${formatBytes(MAX_UPLOAD_IMAGE_BYTES)}.`
+                : `You can also upload an image file, but it's stored with this form's brand data and capped at ${formatBytes(MAX_INLINE_IMAGE_BYTES)} per image — for larger images, host them elsewhere and paste the URL instead.`}
             </p>
           </div>
           <div>
